@@ -1,5 +1,12 @@
+use clap::Parser;
 use std::error::Error;
 use std::fmt;
+
+#[derive(Parser)]
+struct Cli {
+    #[arg(long, short)]
+    path: Option<String>,
+}
 
 #[derive(Debug, Clone, Copy)]
 enum TokenType {
@@ -124,6 +131,7 @@ impl<'a> Lexer<'a> {
     fn get_reserved_token(lexeme: &str) -> TokenType {
         let kind = match lexeme {
             "data" | "program" | "end" => TokenType::TokenLabel,
+            "add" | "sub" | "mul" | "div" => TokenType::TokenInstruction,
             _ => TokenType::TokenIdentfier,
         };
         return kind;
@@ -303,7 +311,7 @@ impl fmt::Display for LexerError {
 
 impl Error for LexerError {}
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> Result<(), Box<dyn Error>> {
     let data = std::fs::read_to_string("utils/asm.txt").expect("ERROR: unable to read file.");
     let mut lexer = Lexer::new(&data);
     lexer.run();
