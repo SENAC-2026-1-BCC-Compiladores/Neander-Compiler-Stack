@@ -2,7 +2,7 @@ use clap::Parser;
 use std::error::Error;
 use std::fmt::{self};
 use std::fs::{self};
-use std::{env, io};
+use std::io;
 
 type InstructionFn = fn(&mut Interpreter, addr: usize);
 struct ProgramCounter(u16);
@@ -138,8 +138,6 @@ impl Interpreter {
             // println!("pc: {}", self.pc.usize() * 2);
             let opcode = self.fetch();
 
-            println!("opcode: {}", opcode);
-
             if let Some(function) = Interpreter::get_rules(opcode) {
                 if opcode == 0 || opcode == 240 {
                     function(self, 0);
@@ -176,7 +174,6 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     let mut buff = String::new();
 
     if let Some(p) = cli.path {
-        println!("{}", p);
         data = fs::read(p)?;
     } else {
         io::stdin().read_line(&mut buff)?;

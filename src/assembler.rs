@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::error::Error;
-use std::fmt;
+use std::io::Read;
+use std::{fmt, fs, io};
 
 #[derive(Parser)]
 struct Cli {
@@ -11,53 +12,45 @@ struct Cli {
 #[derive(Debug, Clone, Copy)]
 enum TokenType {
     // Delimitadores Iniciadores
-    TokenLabel,
+    Label,
 
     // Variaveis
-    TokenIdentfier,
-    TokenVariable,
+    Identfier,
+    Variable,
 
     // Instrucoes
-    TokenInstructionSetUp,
-    TokenInstruction,
+    Instruction,
 
     // Literais
-    TokenNum,
+    Num,
 
     // Simbolos unicos
-    TokenEquals,
-    TokenBang,
-    TokenColon,
-    TokenSemicolon,
-    TokenArrow,
-    TokenComma,
-    TokenSpace,
-    TokenTab,
-    TokenSlashR,
-    TokenNewLine,
-    TokenMinus,
+    Equals,
+    Bang,
+    Colon,
+    Semicolon,
+    Arrow,
+    Comma,
+    NewLine,
+    Minus,
 }
 
 impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
-            TokenType::TokenLabel => "Label",
-            TokenType::TokenIdentfier => "Identfier",
-            TokenType::TokenVariable => "Variable",
-            TokenType::TokenSemicolon => "Semi",
-            TokenType::TokenInstructionSetUp => "Instruction Setup",
-            TokenType::TokenInstruction => "Instruction",
-            TokenType::TokenMinus => "Minus",
-            TokenType::TokenNum => "Number",
-            TokenType::TokenEquals => "Equals",
-            TokenType::TokenBang => "Bang",
-            TokenType::TokenColon => "Colon",
-            TokenType::TokenArrow => "Arrow",
-            TokenType::TokenComma => "Comma",
-            TokenType::TokenSpace => "Space",
-            TokenType::TokenTab => "Tab",
-            TokenType::TokenSlashR => "Return of line",
-            TokenType::TokenNewLine => "New Line",
+            TokenType::Label => "Label",
+            TokenType::Identfier => "Identfier",
+            TokenType::Variable => "Variable",
+            TokenType::Semicolon => "Semi",
+            TokenType::Instruction => "Instruction",
+            TokenType::Minus => "Minus",
+            TokenType::Num => "Number",
+            TokenType::Equals => "Equals",
+            TokenType::Bang => "Bang",
+            TokenType::Colon => "Colon",
+            TokenType::Arrow => "Arrow",
+            TokenType::Comma => "Comma",
+            TokenType::NewLine => "New Line",
         };
 
         write!(f, "{}", name)
@@ -129,12 +122,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn get_reserved_token(lexeme: &str) -> TokenType {
-        let kind = match lexeme {
-            "data" | "program" | "end" => TokenType::TokenLabel,
-            "add" | "sub" | "mul" | "div" => TokenType::TokenInstruction,
-            _ => TokenType::TokenIdentfier,
-        };
-        return kind;
+        match lexeme {
+            "data" | "program" | "end" => TokenType::Label,
+            "add" | "sub" | "mul" | "div" => TokenType::Instruction,
+            _ => TokenType::Identfier,
+        }
     }
 
     fn run(&mut self) {
@@ -152,12 +144,8 @@ impl<'a> Lexer<'a> {
                 }
                 '\n' => {
                     let lexeme = &self.stream[self.position..self.position];
-                    self.tokens.push(Token::new(
-                        TokenType::TokenNewLine,
-                        lexeme,
-                        lexeme,
-                        self.line,
-                    ));
+                    self.tokens
+                        .push(Token::new(TokenType::NewLine, lexeme, lexeme, self.line));
                     self.line += 1;
                 }
                 '@' => {
@@ -177,7 +165,7 @@ impl<'a> Lexer<'a> {
 
                             let lexeme = &self.stream[start_pos..self.position];
                             self.tokens.push(Token::new(
-                                TokenType::TokenVariable,
+                                TokenType::Variable,
                                 lexeme,
                                 lexeme,
                                 self.line,
@@ -193,21 +181,17 @@ impl<'a> Lexer<'a> {
                 ':' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::TokenColon, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Colon, lexeme, lexeme, self.line));
                 }
                 '!' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::TokenBang, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Bang, lexeme, lexeme, self.line));
                 }
                 ';' => {
                     let lexeme = &self.stream[self.position..self.position];
-                    self.tokens.push(Token::new(
-                        TokenType::TokenSemicolon,
-                        lexeme,
-                        lexeme,
-                        self.line,
-                    ));
+                    self.tokens
+                        .push(Token::new(TokenType::Semicolon, lexeme, lexeme, self.line));
                 }
                 '-' => {
                     let start_pos = self.position;
@@ -217,7 +201,7 @@ impl<'a> Lexer<'a> {
 
                             let lexeme = &self.stream[start_pos..self.position];
                             self.tokens.push(Token::new(
-                                TokenType::TokenArrow,
+                                TokenType::Arrow,
                                 lexeme,
                                 lexeme,
                                 self.line,
@@ -225,27 +209,19 @@ impl<'a> Lexer<'a> {
                         }
                     } else {
                         let lexeme = &self.stream[start_pos..self.position];
-                        self.tokens.push(Token::new(
-                            TokenType::TokenMinus,
-                            lexeme,
-                            lexeme,
-                            self.line,
-                        ));
+                        self.tokens
+                            .push(Token::new(TokenType::Minus, lexeme, lexeme, self.line));
                     }
                 }
                 '=' => {
                     let lexeme = &self.stream[self.position..self.position];
-                    self.tokens.push(Token::new(
-                        TokenType::TokenEquals,
-                        lexeme,
-                        lexeme,
-                        self.line,
-                    ));
+                    self.tokens
+                        .push(Token::new(TokenType::Equals, lexeme, lexeme, self.line));
                 }
                 ',' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::TokenComma, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Comma, lexeme, lexeme, self.line));
                 }
                 _ => {
                     if c.is_alphabetic() {
@@ -274,12 +250,8 @@ impl<'a> Lexer<'a> {
                         }
 
                         let lexeme = &self.stream[start_pos..self.position];
-                        self.tokens.push(Token::new(
-                            TokenType::TokenNum,
-                            lexeme,
-                            lexeme,
-                            self.line,
-                        ));
+                        self.tokens
+                            .push(Token::new(TokenType::Num, lexeme, lexeme, self.line));
                     } else {
                         let error_str =
                             format!("Unexpected symbol \"{}\" at line {}", c, self.line);
@@ -312,12 +284,27 @@ impl fmt::Display for LexerError {
 impl Error for LexerError {}
 
 pub fn main() -> Result<(), Box<dyn Error>> {
-    let data = std::fs::read_to_string("utils/asm.txt").expect("ERROR: unable to read file.");
+    let cli = Cli::parse();
+    let data: String;
+    let mut buff = String::new();
+
+    // path para arquivo .asm
+    if let Some(path) = cli.path {
+        data = fs::read_to_string(path)?;
+    } else {
+        io::stdin().read_to_string(&mut buff)?;
+        if buff.trim().is_empty() {
+            return Err("Erro: Arquivo fornecido vazio ou inexistente".into());
+        }
+
+        data = buff;
+    }
+
     let mut lexer = Lexer::new(&data);
     lexer.run();
 
-    for token in lexer.tokens {
-        println!("{}", token);
+    for t in lexer.tokens {
+        println!("{}", t);
     }
 
     if let Some(e) = lexer.error {
