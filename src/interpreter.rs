@@ -37,66 +37,55 @@ struct Cli {
 
 fn nop(_i: &mut Interpreter, _addr: usize) {
     // println!("função nop chamada");
-    return;
 }
 
 fn sta(i: &mut Interpreter, addr: usize) {
     println!("função sta chamada");
     i.mem[addr] = i.acc;
-    return;
 }
 
 fn lda(i: &mut Interpreter, addr: usize) {
     println!("função lda chamada para o endereço: {}", addr);
     i.acc = i.mem[addr];
-    return;
 }
 
 fn add(i: &mut Interpreter, addr: usize) {
     println!("Função soma chamada para o endereço: {}", addr);
     i.acc += i.mem[addr];
-    return;
 }
 
 fn or(i: &mut Interpreter, addr: usize) {
-    i.acc = i.mem[addr] | i.acc;
-    return;
+    i.acc |= i.mem[addr];
 }
 
 fn and(i: &mut Interpreter, addr: usize) {
-    i.acc = i.mem[addr] & i.acc;
-    return;
+    i.acc &= i.mem[addr];
 }
 
 fn not(i: &mut Interpreter, _addr: usize) {
     i.acc = !i.acc;
-    return;
 }
 
 fn jmp(i: &mut Interpreter, addr: usize) {
     println!("função jmp chamada para o endereço: {}", addr);
     println!("mem: {}", i.mem[addr]);
     i.pc.0 = addr as u16;
-    return;
 }
 
 fn jn(i: &mut Interpreter, addr: usize) {
     if i.negative_f {
         jmp(i, addr);
     }
-    return;
 }
 
 fn jz(i: &mut Interpreter, addr: usize) {
     if i.zero_f {
         jmp(i, addr);
     }
-    return;
 }
 
 fn hlt(i: &mut Interpreter, _addr: usize) {
     i.should_stop = true;
-    return;
 }
 
 impl Interpreter {
@@ -113,12 +102,12 @@ impl Interpreter {
 
     fn set_mem(mut self, mem: Vec<u8>) -> Self {
         self.mem = mem;
-        return self;
+        self
     }
 
     fn set_pc(mut self, pc: u16) -> Self {
         self.pc.0 = pc;
-        return self;
+        self
     }
 
     fn get_rules(opcode: u8) -> Option<InstructionFn> {
@@ -145,7 +134,7 @@ impl Interpreter {
     }
 
     fn run(&mut self) {
-        while self.pc.usize() < self.mem.len() && self.should_stop != true {
+        while self.pc.usize() < self.mem.len() && !self.should_stop {
             // println!("pc: {}", self.pc.usize() * 2);
             let opcode = self.fetch();
 
@@ -177,11 +166,11 @@ impl fmt::Display for Interpreter {
             writeln!(f)?;
         }
 
-        write!(f, "\n")
+        writeln!(f)
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let data: Vec<u8>;
     let mut buff = String::new();
