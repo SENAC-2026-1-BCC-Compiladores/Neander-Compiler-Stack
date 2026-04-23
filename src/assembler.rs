@@ -41,7 +41,7 @@ impl fmt::Display for TokenType {
             TokenType::Label => "Label",
             TokenType::Identfier => "Identfier",
             TokenType::Variable => "Variable",
-            TokenType::Semicolon => "Semi",
+            TokenType::Semicolon => "Semicolon",
             TokenType::Instruction => "Instruction",
             TokenType::Minus => "Minus",
             TokenType::Num => "Number",
@@ -143,9 +143,6 @@ impl<'a> Lexer<'a> {
                     continue;
                 }
                 '\n' => {
-                    let lexeme = &self.stream[self.position..self.position];
-                    self.tokens
-                        .push(Token::new(TokenType::NewLine, lexeme, lexeme, self.line));
                     self.line += 1;
                 }
                 '@' => {
@@ -189,9 +186,12 @@ impl<'a> Lexer<'a> {
                         .push(Token::new(TokenType::Bang, lexeme, lexeme, self.line));
                 }
                 ';' => {
-                    let lexeme = &self.stream[self.position..self.position];
-                    self.tokens
-                        .push(Token::new(TokenType::Semicolon, lexeme, lexeme, self.line));
+                    while let Some(c) = self.peek() {
+                        if c == '\n' {
+                            break;
+                        }
+                        self.consume();
+                    }
                 }
                 '-' => {
                     let start_pos = self.position;
