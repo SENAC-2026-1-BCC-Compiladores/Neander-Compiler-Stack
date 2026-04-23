@@ -1,0 +1,7 @@
+<program> ::= "data" <data> "end" "text" <text> "end"
+<data> ::= ("DB" <identifier> <value>)*
+<identifier> ::= [a-z]+
+<value> ::= [0-9]+
+<text> ::= <instruction> <indentifier> "," <indentifier>
+<instruction> ::= "add" | "sub" | "mul" | "div"  
+ 

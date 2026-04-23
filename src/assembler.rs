@@ -123,7 +123,7 @@ impl<'a> Lexer<'a> {
 
     fn get_reserved_token(lexeme: &str) -> TokenType {
         match lexeme {
-            "data" | "program" | "end" => TokenType::Label,
+            "data" | "text" | "end" => TokenType::Label,
             "add" | "sub" | "mul" | "div" => TokenType::Instruction,
             _ => TokenType::Identfier,
         }
