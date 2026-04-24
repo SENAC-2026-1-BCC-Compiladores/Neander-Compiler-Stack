@@ -10,19 +10,19 @@ struct Cli {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum TokenType {
+pub enum TokenType<'a> {
     // Delimitadores Iniciadores
-    Label,
+    Label(&'a str),
 
     // Variaveis
-    Identfier,
-    Variable,
+    Identfier(&'a str),
+    Variable(&'a str),
 
     // Instrucoes
-    Instruction,
+    Instruction(&'a str),
 
     // Literais
-    Num,
+    Num(i8),
 
     // Simbolos unicos
     Equals,
@@ -35,16 +35,22 @@ enum TokenType {
     Minus,
 }
 
-impl fmt::Display for TokenType {
+struct NodeT<'a> {
+    pub left: Option<Box<NodeT<'a>>>,
+    pub right: Option<Box<NodeT<'a>>>,
+    pub kind: TokenType<'a>,
+}
+
+impl<'a> fmt::Display for TokenType<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
-            TokenType::Label => "Label",
-            TokenType::Identfier => "Identfier",
-            TokenType::Variable => "Variable",
+            TokenType::Label(_) => "Label",
+            TokenType::Identfier(_) => "Identfier",
+            TokenType::Variable(_) => "Variable",
             TokenType::Semicolon => "Semicolon",
-            TokenType::Instruction => "Instruction",
+            TokenType::Instruction(_) => "Instruction",
             TokenType::Minus => "Minus",
-            TokenType::Num => "Number",
+            TokenType::Num(_) => "Number",
             TokenType::Equals => "Equals",
             TokenType::Bang => "Bang",
             TokenType::Colon => "Colon",
@@ -58,20 +64,14 @@ impl fmt::Display for TokenType {
 }
 
 pub struct Token<'a> {
-    kind: TokenType,
+    kind: TokenType<'a>,
     lexeme: &'a str,
-    literal: Option<&'a str>,
     line: usize,
 }
 
 impl<'a> Token<'a> {
-    fn new(kind: TokenType, lexeme: &'a str, literal: &'a str, line: usize) -> Self {
-        Token {
-            kind,
-            lexeme,
-            literal: Some(literal),
-            line,
-        }
+    fn new(kind: TokenType<'a>, lexeme: &'a str, line: usize) -> Self {
+        Token { kind, lexeme, line }
     }
 }
 
@@ -91,6 +91,7 @@ pub struct Lexer<'a> {
     stream: &'a str,
     pub tokens: Vec<Token<'a>>,
     pub position: usize,
+    pub cursor: usize,
     pub ch: char,
     pub error: Option<LexerError>,
     pub line: usize,
@@ -102,6 +103,7 @@ impl<'a> Lexer<'a> {
             stream,
             tokens: vec![],
             position: 0,
+            cursor: 0,
             ch: '\0',
             error: None,
             line: 1,
@@ -121,11 +123,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn get_reserved_token(lexeme: &str) -> TokenType {
+    fn get_reserved_token(lexeme: &'a str) -> TokenType<'a> {
         match lexeme {
-            "data" | "text" | "end" => TokenType::Label,
-            "add" | "sub" | "mul" | "div" => TokenType::Instruction,
-            _ => TokenType::Identfier,
+            "data" | "text" | "end" => TokenType::Label(lexeme),
+            "add" | "sub" | "mul" | "div" => TokenType::Instruction(lexeme),
+            _ => TokenType::Identfier(lexeme),
         }
     }
 
@@ -162,8 +164,7 @@ impl<'a> Lexer<'a> {
 
                             let lexeme = &self.stream[start_pos..self.position];
                             self.tokens.push(Token::new(
-                                TokenType::Variable,
-                                lexeme,
+                                TokenType::Variable(lexeme),
                                 lexeme,
                                 self.line,
                             ));
@@ -178,12 +179,12 @@ impl<'a> Lexer<'a> {
                 ':' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::Colon, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Colon, lexeme, self.line));
                 }
                 '!' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::Bang, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Bang, lexeme, self.line));
                 }
                 ';' => {
                     while let Some(c) = self.peek() {
@@ -200,28 +201,24 @@ impl<'a> Lexer<'a> {
                             self.consume();
 
                             let lexeme = &self.stream[start_pos..self.position];
-                            self.tokens.push(Token::new(
-                                TokenType::Arrow,
-                                lexeme,
-                                lexeme,
-                                self.line,
-                            ));
+                            self.tokens
+                                .push(Token::new(TokenType::Arrow, lexeme, self.line));
                         }
                     } else {
                         let lexeme = &self.stream[start_pos..self.position];
                         self.tokens
-                            .push(Token::new(TokenType::Minus, lexeme, lexeme, self.line));
+                            .push(Token::new(TokenType::Minus, lexeme, self.line));
                     }
                 }
                 '=' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::Equals, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Equals, lexeme, self.line));
                 }
                 ',' => {
                     let lexeme = &self.stream[self.position..self.position];
                     self.tokens
-                        .push(Token::new(TokenType::Comma, lexeme, lexeme, self.line));
+                        .push(Token::new(TokenType::Comma, lexeme, self.line));
                 }
                 _ => {
                     if c.is_alphabetic() {
@@ -236,8 +233,7 @@ impl<'a> Lexer<'a> {
                         }
                         let lexeme = &self.stream[start_pos..self.position];
                         let kind = Lexer::get_reserved_token(lexeme);
-                        self.tokens
-                            .push(Token::new(kind, lexeme, lexeme, self.line));
+                        self.tokens.push(Token::new(kind, lexeme, self.line));
                     } else if c.is_numeric() {
                         let start_pos = self.position - 1;
 
@@ -250,8 +246,17 @@ impl<'a> Lexer<'a> {
                         }
 
                         let lexeme = &self.stream[start_pos..self.position];
+                        let num: i8 = match lexeme.parse() {
+                            Ok(n) => n,
+                            Err(_) => {
+                                let error_str = format!("Invalid u8 at line {}", self.line);
+                                let error = LexerError::new(error_str);
+                                self.error = Some(error);
+                                0
+                            }
+                        };
                         self.tokens
-                            .push(Token::new(TokenType::Num, lexeme, lexeme, self.line));
+                            .push(Token::new(TokenType::Num(num), lexeme, self.line));
                     } else {
                         let error_str =
                             format!("Unexpected symbol \"{}\" at line {}", c, self.line);

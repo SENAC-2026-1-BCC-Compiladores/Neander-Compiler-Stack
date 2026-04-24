@@ -1,7 +1,10 @@
-<program> ::= "data" <data> "end" "text" <text> "end"
-<data> ::= ("DB" <identifier> <value>)*
-<identifier> ::= [a-z]+
-<value> ::= [0-9]+
-<text> ::= <instruction> <indentifier> "," <indentifier>
-<instruction> ::= "add" | "sub" | "mul" | "div"  
- 
+<program> ::= "data" <space> <nl> <data> <space> <nl> "end" <space> <nl> "text" <space> <nl> <text> <space> <nl> "end"
+<data> ::= "DB" <space> <identifier> <space> <value> | <data> <nl> <data>
+<identifier> ::= <letter> | <letter> <letter>
+<letter> ::= "a" | "b" | "c" | "d" | "e" | "f"
+<value> ::= <number> | <number> <number>
+<number> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<text> ::= <instruction> <space> <identifier> "," <space> <identifier> | <text> <text>
+<instruction> ::= "add" | "sub" | "mul" | "div"
+<space> ::= " " | <space> <space>
+<nl> ::= "\n" | <nl> <nl>
