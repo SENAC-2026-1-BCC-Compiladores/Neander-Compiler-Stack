@@ -6,9 +6,6 @@ data
 end
 
 text
-	add A, B
-	sub A, B
-	mul A, B
-	div A, B
+	add A
 	hlt
 end

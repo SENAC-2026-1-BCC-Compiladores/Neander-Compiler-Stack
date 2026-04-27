@@ -41,6 +41,11 @@ struct NodeT<'a> {
     pub kind: TokenType<'a>,
 }
 
+struct ParserT<'a> {
+    pub lookahead: Option<Token<'a>>,
+    pub valid: bool,
+}
+
 impl<'a> fmt::Display for TokenType<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
@@ -92,9 +97,9 @@ pub struct Lexer<'a> {
     pub tokens: Vec<Token<'a>>,
     pub position: usize,
     pub cursor: usize,
-    pub ch: char,
     pub error: Option<LexerError>,
     pub line: usize,
+    pub col: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -104,9 +109,9 @@ impl<'a> Lexer<'a> {
             tokens: vec![],
             position: 0,
             cursor: 0,
-            ch: '\0',
             error: None,
             line: 1,
+            col: 0,
         }
     }
 
@@ -126,21 +131,38 @@ impl<'a> Lexer<'a> {
     fn get_reserved_token(lexeme: &'a str) -> TokenType<'a> {
         match lexeme {
             "data" | "text" | "end" => TokenType::Label(lexeme),
-            "add" | "sub" | "mul" | "div" => TokenType::Instruction(lexeme),
+            "nop" | "add" | "sta" | "lda" | "or" |
+            "and" | "not" | "jmp" | "jn" | "jz" | "hlt"
+                => TokenType::Instruction(lexeme),
             _ => TokenType::Identfier(lexeme),
         }
-    }
+    } 
 
-    fn run(&mut self) {
-        // enquanto funcao avancar funcionar continua
+    fn skip_blank(&mut self) {
+        while let Some(c) = self.peek()  {
+            if c == '\n' || c == '\t' {
+                self.consume();
+            } else {
+                break;
+            }
+        }        
+    } 
+
+    fn next_token (&mut self) -> Option<Result<Token, LexerError>> {
+        let c = self.consume()?;
+        self.skip_blank();
+        match c {
+            _ => {
+                let error_str = format!("Error: unexpected symbol at line: {}");
+                return Some(Err(LexerError::new(error_str)));
+            }
+        };
         while let Some(c) = self.consume() {
             if self.error.is_some() {
                 break;
             }
 
             match c {
-                // ignorar espaços
-                // pular comentários
                 ' ' | '\t' | '\r' => {
                     continue;
                 }
@@ -163,7 +185,7 @@ impl<'a> Lexer<'a> {
                             }
 
                             let lexeme = &self.stream[start_pos..self.position];
-                            self.tokens.push(Token::new(
+                            return Token::new(
                                 TokenType::Variable(lexeme),
                                 lexeme,
                                 self.line,
@@ -283,6 +305,15 @@ impl LexerError {
 impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ERROR: {}", self.message)
+    }
+}
+
+impl<'a> ParserT<'a> {
+    fn new(lexer: Lexer<'a>) -> Self {
+        Self {
+            lookahead: Some(lexer.tokens[0]),
+            valid: true,
+        }
     }
 }
 
