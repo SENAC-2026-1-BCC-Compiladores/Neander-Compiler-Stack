@@ -1,6 +1,7 @@
 use clap::Parser;
 use std::error::Error;
 use std::io::Read;
+use std::ops::DerefMut;
 use std::{fmt, fs, io};
 
 #[derive(Parser)]
@@ -22,7 +23,7 @@ pub enum TokenType<'a> {
     Instruction(&'a str),
 
     // Literais
-    Num(i8),
+    Num(u8),
 
     // Simbolos unicos
     Equals,
@@ -97,7 +98,7 @@ pub struct Lexer<'a> {
     pub tokens: Vec<Token<'a>>,
     pub position: usize,
     pub cursor: usize,
-    pub error: Option<LexerError>,
+    pub error: bool,
     pub line: usize,
     pub col: usize,
 }
@@ -109,9 +110,9 @@ impl<'a> Lexer<'a> {
             tokens: vec![],
             position: 0,
             cursor: 0,
-            error: None,
+            error: false,
             line: 1,
-            col: 0,
+            col: 1,
         }
     }
 
@@ -122,6 +123,7 @@ impl<'a> Lexer<'a> {
     fn consume(&mut self) -> Option<char> {
         if let Some(c) = self.peek() {
             self.position += c.len_utf8();
+            self.col += 1;
             Some(c)
         } else {
             None
@@ -130,162 +132,109 @@ impl<'a> Lexer<'a> {
 
     fn get_reserved_token(lexeme: &'a str) -> TokenType<'a> {
         match lexeme {
-            "data" | "text" | "end" => TokenType::Label(lexeme),
-            "nop" | "add" | "sta" | "lda" | "or" |
-            "and" | "not" | "jmp" | "jn" | "jz" | "hlt"
-                => TokenType::Instruction(lexeme),
+            "setup" | "text" | "end" => TokenType::Label(lexeme),
+            "nop" | "DATA" | "SPACE" | "ORG" | "add" | "sta" | "lda" | "or" | "and" | "not"
+            | "jmp" | "jn" | "jz" | "hlt" => TokenType::Instruction(lexeme),
             _ => TokenType::Identfier(lexeme),
         }
-    } 
+    }
 
     fn skip_blank(&mut self) {
-        while let Some(c) = self.peek()  {
-            if c == '\n' || c == '\t' {
-                self.consume();
+        while let Some(' ' | '\t') = self.peek() {
+            self.consume();
+        }
+    }
+
+    fn new_line(&mut self) -> Result<Token<'_>, LexerError> {
+        // consuming the first '\n'
+        self.consume();
+        self.line += 1;
+        self.col = 1;
+
+        // check for others \n
+        while let Some(c) = self.peek() {
+            if c != '\n' {
+                break;
+            }
+            self.consume();
+            self.line += 1;
+            self.col = 1;
+        }
+
+        Ok(Token::new(TokenType::NewLine, "\n", self.line))
+    }
+
+    fn ignore_comments(&mut self) {
+        if let Some(';') = self.peek() {
+            self.consume();
+
+            while let Some(stop) = self.peek() {
+                if stop == '\n' {
+                    break;
+                } else {
+                    self.consume();
+                }
+            }
+        }
+    }
+
+    fn consume_alpha(&mut self) -> Result<Token<'_>, LexerError> {
+        let start_idx = self.position;
+
+        while let Some(c) = self.peek() {
+            if !c.is_alphabetic() {
+                break;
             } else {
-                break;
+                self.consume();
             }
-        }        
-    } 
+        }
 
-    fn next_token (&mut self) -> Option<Result<Token, LexerError>> {
-        let c = self.consume()?;
+        let kind = Lexer::get_reserved_token(&self.stream[start_idx..self.position]);
+        Ok(Token::new(
+            kind,
+            &self.stream[start_idx..self.position],
+            self.line,
+        ))
+    }
+
+    fn consume_numeric(&mut self) -> Result<Token<'_>, LexerError> {
+        let start_idx = self.position;
+
+        while let Some(c) = self.peek() {
+            if !c.is_ascii_digit() {
+                break;
+            } else {
+                self.consume();
+            }
+        }
+
+        let lex_str = &self.stream[start_idx..self.position];
+        match lex_str.parse::<u8>() {
+            Ok(num) => Ok(Token::new(TokenType::Num(num), lex_str, self.line)),
+            Err(_) => {
+                let str_error = format!(
+                    "Error: number '{}' out of bounds expected (0-255) at: {}:{}",
+                    lex_str, self.line, self.col
+                );
+                Err(LexerError::new(str_error))
+            }
+        }
+    }
+
+    fn next_token(&mut self) -> Option<Result<Token<'_>, LexerError>> {
         self.skip_blank();
+        self.ignore_comments();
+        let c = self.peek()?;
         match c {
+            '\n' => Some(self.new_line()),
+            c if c.is_alphabetic() => Some(self.consume_alpha()),
+            c if c.is_numeric() => Some(self.consume_numeric()),
             _ => {
-                let error_str = format!("Error: unexpected symbol at line: {}");
-                return Some(Err(LexerError::new(error_str)));
-            }
-        };
-        while let Some(c) = self.consume() {
-            if self.error.is_some() {
-                break;
-            }
-
-            match c {
-                ' ' | '\t' | '\r' => {
-                    continue;
-                }
-                '\n' => {
-                    self.line += 1;
-                }
-                '@' => {
-                    let start_pos = self.position - 1;
-
-                    if let Some(next_char) = self.peek() {
-                        if next_char.is_alphabetic() {
-                            self.consume();
-
-                            while let Some(c) = self.peek() {
-                                if c.is_alphabetic() {
-                                    self.consume();
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            let lexeme = &self.stream[start_pos..self.position];
-                            return Token::new(
-                                TokenType::Variable(lexeme),
-                                lexeme,
-                                self.line,
-                            ));
-                        }
-                    } else {
-                        let error_str =
-                            format!("Error: invalid format after {} at line {}", c, self.line);
-                        let error = LexerError::new(error_str);
-                        self.error = Some(error);
-                    }
-                }
-                ':' => {
-                    let lexeme = &self.stream[self.position..self.position];
-                    self.tokens
-                        .push(Token::new(TokenType::Colon, lexeme, self.line));
-                }
-                '!' => {
-                    let lexeme = &self.stream[self.position..self.position];
-                    self.tokens
-                        .push(Token::new(TokenType::Bang, lexeme, self.line));
-                }
-                ';' => {
-                    while let Some(c) = self.peek() {
-                        if c == '\n' {
-                            break;
-                        }
-                        self.consume();
-                    }
-                }
-                '-' => {
-                    let start_pos = self.position;
-                    if let Some(next_char) = self.peek() {
-                        if next_char == '>' {
-                            self.consume();
-
-                            let lexeme = &self.stream[start_pos..self.position];
-                            self.tokens
-                                .push(Token::new(TokenType::Arrow, lexeme, self.line));
-                        }
-                    } else {
-                        let lexeme = &self.stream[start_pos..self.position];
-                        self.tokens
-                            .push(Token::new(TokenType::Minus, lexeme, self.line));
-                    }
-                }
-                '=' => {
-                    let lexeme = &self.stream[self.position..self.position];
-                    self.tokens
-                        .push(Token::new(TokenType::Equals, lexeme, self.line));
-                }
-                ',' => {
-                    let lexeme = &self.stream[self.position..self.position];
-                    self.tokens
-                        .push(Token::new(TokenType::Comma, lexeme, self.line));
-                }
-                _ => {
-                    if c.is_alphabetic() {
-                        let start_pos = self.position - 1;
-
-                        while let Some(ch) = self.peek() {
-                            if ch.is_alphanumeric() || ch == '_' {
-                                self.consume();
-                            } else {
-                                break;
-                            }
-                        }
-                        let lexeme = &self.stream[start_pos..self.position];
-                        let kind = Lexer::get_reserved_token(lexeme);
-                        self.tokens.push(Token::new(kind, lexeme, self.line));
-                    } else if c.is_numeric() {
-                        let start_pos = self.position - 1;
-
-                        while let Some(ch) = self.peek() {
-                            if ch.is_numeric() {
-                                self.consume();
-                            } else {
-                                break;
-                            }
-                        }
-
-                        let lexeme = &self.stream[start_pos..self.position];
-                        let num: i8 = match lexeme.parse() {
-                            Ok(n) => n,
-                            Err(_) => {
-                                let error_str = format!("Invalid u8 at line {}", self.line);
-                                let error = LexerError::new(error_str);
-                                self.error = Some(error);
-                                0
-                            }
-                        };
-                        self.tokens
-                            .push(Token::new(TokenType::Num(num), lexeme, self.line));
-                    } else {
-                        let error_str =
-                            format!("Unexpected symbol \"{}\" at line {}", c, self.line);
-                        let error = LexerError::new(error_str);
-                        self.error = Some(error);
-                    }
-                }
+                let error_str = format!(
+                    "Error: unexpected symbol '{}' at {}:{}",
+                    c, self.line, self.col
+                );
+                Some(Err(LexerError::new(error_str)))
             }
         }
     }
@@ -311,7 +260,7 @@ impl fmt::Display for LexerError {
 impl<'a> ParserT<'a> {
     fn new(lexer: Lexer<'a>) -> Self {
         Self {
-            lookahead: Some(lexer.tokens[0]),
+            lookahead: None,
             valid: true,
         }
     }
@@ -337,14 +286,11 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut lexer = Lexer::new(&data);
-    lexer.run();
-
-    for t in lexer.tokens {
-        println!("{}", t);
-    }
-
-    if let Some(e) = lexer.error {
-        println!("{}", e);
+    while let Some(t) = lexer.next_token() {
+        match t {
+            Ok(token) => println!("{}", token),
+            Err(e) => println!("{}", e),
+        }
     }
 
     Ok(())

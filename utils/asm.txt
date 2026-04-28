@@ -1,8 +1,10 @@
 ; Exemplo minimo de assembly
 
-data
-	DB A 44
-	DB B 50
+setup
+	A DATA 44
+	B DATA 50
+	C SPACE 5
+	ORG 4
 end
 
 text
