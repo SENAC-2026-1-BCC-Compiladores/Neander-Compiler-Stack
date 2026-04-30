@@ -270,6 +270,8 @@ struct ParserT<'a> {
     pub lexer: Lexer<'a>,
     pub lookahead: Option<Token<'a>>,
     pub valid: bool,
+    pub symbols: SymbolTable,
+    pub program: Option<Program>,
 }
 
 impl<'a> ParserT<'a> {
@@ -289,6 +291,8 @@ impl<'a> ParserT<'a> {
             lexer,
             lookahead: first_token,
             valid: is_valid,
+            symbols: SymbolTable::new(),
+            program: None,
         }
     }
 
@@ -562,6 +566,75 @@ impl<'a> ParserT<'a> {
         let p = Program { setup: data, text };
         Ok(p)
     }
+
+    fn parse(&mut self) -> Result<(), LexerError> {
+        let parsed_program = self.parse_program()?;
+        self.symbols.build(&parsed_program.setup)?;
+        self.program = Some(parsed_program);
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct SymbolTable {
+    pub program_counter: u8,
+    pub map: HashMap<String, u8>,
+}
+
+impl SymbolTable {
+    pub fn new() -> Self {
+        Self {
+            program_counter: 4,
+            map: HashMap::new(),
+        }
+    }
+
+    fn build(&mut self, declarations: &[DataDecl]) -> Result<(), LexerError> {
+        let mut current_addr: u8 = 250;
+
+        for decl in declarations {
+            match decl {
+                DataDecl::Data(var, _value) => {
+                    if self.map.contains_key(var) {
+                        return Err(LexerError::new(format!(
+                            "Semantic error. Var '{}' was already declared.",
+                            var
+                        )));
+                    }
+
+                    self.map.insert(var.clone(), current_addr);
+                    current_addr -= 1;
+                }
+                DataDecl::Space(var, size) => {
+                    if self.map.contains_key(var) {
+                        return Err(LexerError::new(format!(
+                            "Semantic error. Var '{}' was already declared.",
+                            var
+                        )));
+                    }
+
+                    current_addr -= size - 1;
+
+                    self.map.insert(var.clone(), current_addr);
+                }
+                DataDecl::Org(addr) => {
+                    if self.program_counter != 4 || *addr < 4u8 {
+                        return Err(LexerError::new(
+                            "Semantic error. Program count was already set.".into(),
+                        ));
+                    }
+                    self.program_counter = *addr;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Default for SymbolTable {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub fn main() -> Result<(), Box<dyn Error>> {
@@ -583,7 +656,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
     let lexer = Lexer::new(&data);
     let mut parser = ParserT::new(lexer);
-    parser.parse_program()?;
+    parser.parse()?;
 
     Ok(())
 }
