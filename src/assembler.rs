@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::collections::btree_map::ExtractIf;
+use std::collections::HashMap;
 use std::error::Error;
 use std::io::Read;
 use std::{fmt, fs, io};
@@ -55,12 +55,6 @@ enum Instruction {
 struct Program {
     setup: Vec<DataDecl>,
     text: Vec<Instruction>,
-}
-
-struct ParserT<'a> {
-    pub lexer: Lexer<'a>,
-    pub lookahead: Option<Token<'a>>,
-    pub valid: bool,
 }
 
 impl<'a> fmt::Display for TokenType<'a> {
@@ -268,6 +262,14 @@ impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ERROR: {}", self.message)
     }
+}
+
+impl Error for LexerError {}
+
+struct ParserT<'a> {
+    pub lexer: Lexer<'a>,
+    pub lookahead: Option<Token<'a>>,
+    pub valid: bool,
 }
 
 impl<'a> ParserT<'a> {
@@ -561,8 +563,6 @@ impl<'a> ParserT<'a> {
         Ok(p)
     }
 }
-
-impl Error for LexerError {}
 
 pub fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
