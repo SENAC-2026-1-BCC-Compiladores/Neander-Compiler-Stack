@@ -436,7 +436,7 @@ impl<'a> ParserT<'a> {
                 let num = self.expect_number()?;
                 Ok(DataDecl::Org(num))
             }
-            Some(TokenType::Instruction(_)) => {
+            Some(TokenType::Identfier(_)) => {
                 let id = self.expect_identifier()?;
                 let instr = self.expect_instruction()?;
                 match instr {
@@ -460,7 +460,7 @@ impl<'a> ParserT<'a> {
             Some(kind) => {
                 let line = self.lookahead.as_ref().unwrap().line;
                 Err(LexerError::new(format!(
-                    "Unexpected token at {}. Expected data statement, but found '{}'",
+                    "Unexpected token at line {}. Expected data statement, but found '{}'",
                     line, kind
                 )))
             }
@@ -524,4 +524,31 @@ pub fn main() -> Result<(), Box<dyn Error>> {
     let mut parser = ParserT::new(lexer);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_data_section() {
+        let source = "setup\n A DATA 44\n ORG 4\n B SPACE 5\n end";
+        let lexer = Lexer::new(source);
+        let mut parser = ParserT::new(lexer);
+
+        let result = parser.parse_data();
+
+        assert!(
+            result.is_ok(),
+            "Error returned from parser: {:?}",
+            result.err()
+        );
+
+        let statements = result.unwrap();
+        assert_eq!(statements.len(), 3);
+
+        assert_eq!(statements[0], DataDecl::Data("A".to_string(), 44));
+        assert_eq!(statements[1], DataDecl::Org(4));
+        assert_eq!(statements[2], DataDecl::Space("B".to_string(), 5));
+    }
 }
