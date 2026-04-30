@@ -532,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_parse_data_section() {
-        let source = "setup\n A DATA 44\n ORG 4\n B SPACE 5\n end";
+        let source = "setup\n\n\n\n A DATA 44\n\n\n\n\n\n ORG 4\n\n B SPACE 5\n\n end";
         let lexer = Lexer::new(source);
         let mut parser = ParserT::new(lexer);
 
