@@ -26,14 +26,8 @@ pub enum TokenType<'a> {
     Num(u8),
 
     // Simbolos unicos
-    Equals,
-    Bang,
-    Colon,
     Semicolon,
-    Arrow,
-    Comma,
     NewLine,
-    Minus,
 }
 
 #[derive(Debug, PartialEq)]
@@ -43,6 +37,7 @@ enum DataDecl {
     Org(u8),
 }
 
+#[derive(Debug, PartialEq)]
 enum Instruction {
     Add(String),
     Lda(String),
@@ -76,13 +71,7 @@ impl<'a> fmt::Display for TokenType<'a> {
             TokenType::Variable(_) => "Variable",
             TokenType::Semicolon => "Semicolon",
             TokenType::Instruction(_) => "Instruction",
-            TokenType::Minus => "Minus",
             TokenType::Num(_) => "Number",
-            TokenType::Equals => "Equals",
-            TokenType::Bang => "Bang",
-            TokenType::Colon => "Colon",
-            TokenType::Arrow => "Arrow",
-            TokenType::Comma => "Comma",
             TokenType::NewLine => "New Line",
         };
 
@@ -497,6 +486,20 @@ impl<'a> ParserT<'a> {
 
         self.expect_label("end")?;
         Ok(data_statements)
+    }
+
+    fn parse_instruction(&mut self) -> Result<Instruction, LexerError> {
+        let instr = self.expect_instruction()?;
+        let i = Instruction::Nop;
+        Ok(i)
+    }
+
+    fn parse_text(&mut self) -> Result<Vec<Instruction>, LexerError> {
+        let instructions = Vec::<Instruction>::new();
+        self.expect_label("text")?;
+
+        self.expect_label("end")?;
+        Ok(instructions)
     }
 
     fn parse_program(&mut self) -> Result<(), LexerError> {
