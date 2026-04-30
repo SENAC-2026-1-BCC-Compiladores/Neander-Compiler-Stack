@@ -325,6 +325,13 @@ impl<'a> ParserT<'a> {
         }
     }
 
+    fn consume_blanks(&mut self) -> Result<(), LexerError> {
+        while let Some(TokenType::NewLine) = self.peek_kind() {
+            self.advance()?;
+        }
+        Ok(())
+    }
+
     fn expect(&mut self, expected: TokenType<'a>) -> Result<(), LexerError> {
         match self.peek_kind() {
             Some(kind) if kind == expected => {
@@ -493,6 +500,9 @@ impl<'a> ParserT<'a> {
     }
 
     fn parse_program(&mut self) -> Result<(), LexerError> {
+        self.consume_blanks()?;
+        self.parse_data()?;
+        self.consume_blanks()?;
         Ok(())
     }
 
