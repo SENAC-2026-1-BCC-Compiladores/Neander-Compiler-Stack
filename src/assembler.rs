@@ -1,7 +1,7 @@
 use clap::Parser;
+use std::collections::btree_map::ExtractIf;
 use std::error::Error;
 use std::io::Read;
-use std::ops::DerefMut;
 use std::{fmt, fs, io};
 
 #[derive(Parser)]
@@ -10,7 +10,7 @@ struct Cli {
     path: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType<'a> {
     // Delimitadores Iniciadores
     Label(&'a str),
@@ -36,13 +36,34 @@ pub enum TokenType<'a> {
     Minus,
 }
 
-struct NodeT<'a> {
-    pub left: Option<Box<NodeT<'a>>>,
-    pub right: Option<Box<NodeT<'a>>>,
-    pub kind: TokenType<'a>,
+#[derive(Debug, PartialEq)]
+enum DataDecl {
+    Data(String, u8),
+    Space(String, u8),
+    Org(u8),
+}
+
+enum Instruction {
+    Add(String),
+    Lda(String),
+    Sta(String),
+    Hlt,
+    Nop,
+    Jmp(u8),
+    Jz(u8),
+    Jn(u8),
+    Not(String),
+    Or(String),
+    And(String),
+}
+
+struct Program {
+    setup: Vec<DataDecl>,
+    text: Vec<Instruction>,
 }
 
 struct ParserT<'a> {
+    pub lexer: Lexer<'a>,
     pub lookahead: Option<Token<'a>>,
     pub valid: bool,
 }
@@ -69,6 +90,7 @@ impl<'a> fmt::Display for TokenType<'a> {
     }
 }
 
+#[derive(PartialEq)]
 pub struct Token<'a> {
     kind: TokenType<'a>,
     lexeme: &'a str,
@@ -145,7 +167,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn new_line(&mut self) -> Result<Token<'_>, LexerError> {
+    fn new_line(&mut self) -> Result<Token<'a>, LexerError> {
         // consuming the first '\n'
         self.consume();
         self.line += 1;
@@ -178,7 +200,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn consume_alpha(&mut self) -> Result<Token<'_>, LexerError> {
+    fn consume_alpha(&mut self) -> Result<Token<'a>, LexerError> {
         let start_idx = self.position;
 
         while let Some(c) = self.peek() {
@@ -197,7 +219,7 @@ impl<'a> Lexer<'a> {
         ))
     }
 
-    fn consume_numeric(&mut self) -> Result<Token<'_>, LexerError> {
+    fn consume_numeric(&mut self) -> Result<Token<'a>, LexerError> {
         let start_idx = self.position;
 
         while let Some(c) = self.peek() {
@@ -221,7 +243,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Option<Result<Token<'_>, LexerError>> {
+    fn next_token(&mut self) -> Option<Result<Token<'a>, LexerError>> {
         self.skip_blank();
         self.ignore_comments();
         let c = self.peek()?;
@@ -258,11 +280,224 @@ impl fmt::Display for LexerError {
 }
 
 impl<'a> ParserT<'a> {
-    fn new(lexer: Lexer<'a>) -> Self {
+    fn new(mut lexer: Lexer<'a>) -> Self {
+        let next_t = lexer.next_token();
+
+        let (first_token, is_valid) = match next_t {
+            Some(Ok(token)) => (Some(token), true),
+            Some(Err(e)) => {
+                println!("Error: lexical error at init: {}", e);
+                (None, false)
+            }
+            None => (None, true),
+        };
+
         Self {
-            lookahead: None,
-            valid: true,
+            lexer,
+            lookahead: first_token,
+            valid: is_valid,
         }
+    }
+
+    fn peek(&self) -> Option<&Token<'a>> {
+        self.lookahead.as_ref()
+    }
+
+    fn peek_kind(&self) -> Option<TokenType<'a>> {
+        Some(self.lookahead.as_ref().unwrap().kind)
+    }
+
+    fn advance(&mut self) -> Result<(), LexerError> {
+        match self.lexer.next_token() {
+            Some(Ok(token)) => {
+                self.lookahead = Some(token);
+                Ok(())
+            }
+            Some(Err(e)) => {
+                self.lookahead = None;
+                self.valid = false;
+                Err(e)
+            }
+            None => {
+                self.lookahead = None;
+                Ok(())
+            }
+        }
+    }
+
+    fn expect(&mut self, expected: TokenType<'a>) -> Result<(), LexerError> {
+        match self.peek_kind() {
+            Some(kind) if kind == expected => {
+                self.advance()?;
+                Ok(())
+            }
+            Some(t) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                let str_error = format!(
+                    "Syntax error at {} expected '{}' but found '{}'",
+                    line, expected, t
+                );
+                Err(LexerError::new(str_error))
+            }
+            None => Err(LexerError::new(format!(
+                "Unexpected end of file. Expected {}",
+                expected
+            ))),
+        }
+    }
+
+    fn expect_identifier(&mut self) -> Result<&'a str, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Identfier(name)) => {
+                let extrected_name = name;
+                self.advance()?;
+                Ok(extrected_name)
+            }
+            Some(kind) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Syntax error at {}, expected Identifier, found {}",
+                    line, kind
+                )))
+            }
+            None => Err(LexerError::new(
+                "End of file, expected identifier".to_string(),
+            )),
+        }
+    }
+
+    fn expect_label(&mut self, expected_label: &str) -> Result<(), LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Label(name)) if name == expected_label => {
+                self.advance()?;
+                Ok(())
+            }
+            Some(kind) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Syntax error at {}, expected label '{}', but found {}",
+                    line, expected_label, kind
+                )))
+            }
+            None => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Unexpected end of file. Expected label '{}' at line {}",
+                    expected_label, line
+                )))
+            }
+        }
+    }
+
+    fn expect_number(&mut self) -> Result<u8, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Num(value)) => {
+                let extracted_number = value;
+                self.advance()?;
+                Ok(extracted_number)
+            }
+            Some(kind) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Syntax error at line {}. Expected 'u8' number, found {}",
+                    line, kind
+                )))
+            }
+            None => Err(LexerError::new(
+                "Unexpected end of file. Expected 'u8' number".into(),
+            )),
+        }
+    }
+
+    fn expect_instruction(&mut self) -> Result<&'a str, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Instruction(name)) => {
+                let extracted_name = name;
+                self.advance()?;
+                Ok(extracted_name)
+            }
+            Some(kind) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Syntax error at line {}. Expected instruction found {}",
+                    line, kind
+                )))
+            }
+            None => Err(LexerError::new(
+                "Unexpected end of file. Expected Instruction".into(),
+            )),
+        }
+    }
+
+    fn parse_data_stmt(&mut self) -> Result<DataDecl, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Instruction("ORG")) => {
+                self.advance()?;
+                let num = self.expect_number()?;
+                Ok(DataDecl::Org(num))
+            }
+            Some(TokenType::Instruction(_)) => {
+                let id = self.expect_identifier()?;
+                let instr = self.expect_instruction()?;
+                match instr {
+                    "DATA" => {
+                        let num = self.expect_number()?;
+                        Ok(DataDecl::Data(id.to_string(), num))
+                    }
+                    "SPACE" => {
+                        let num = self.expect_number()?;
+                        Ok(DataDecl::Space(id.to_string(), num))
+                    }
+                    _ => {
+                        let line = self.lookahead.as_ref().map_or(0, |t| t.line);
+                        Err(LexerError::new(format!(
+                            "Error at line {}. Expected 'DATA' or 'SPACE' but found '{}'",
+                            line, instr
+                        )))
+                    }
+                }
+            }
+            Some(kind) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Unexpected token at {}. Expected data statement, but found '{}'",
+                    line, kind
+                )))
+            }
+            None => Err(LexerError::new(
+                "Unexpected end of file at line. Expected data statement".into(),
+            )),
+        }
+    }
+
+    fn parse_data(&mut self) -> Result<Vec<DataDecl>, LexerError> {
+        let mut data_statements = Vec::<DataDecl>::new();
+        self.expect_label("setup")?;
+        self.expect(TokenType::NewLine)?;
+
+        while let Some(kind) = self.peek_kind() {
+            match kind {
+                TokenType::Label("end") => break,
+                TokenType::NewLine => {
+                    self.advance()?;
+                }
+                _ => {
+                    let data = self.parse_data_stmt()?;
+                    data_statements.push(data);
+                }
+            }
+        }
+
+        self.expect_label("end")?;
+        Ok(data_statements)
+    }
+
+    fn parse_program(&mut self) -> Result<(), LexerError> {
+        Ok(())
+    }
+
+    fn parse(&mut self) -> Result<(), LexerError> {
+        Ok(())
     }
 }
 
@@ -285,13 +520,8 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         data = buff;
     }
 
-    let mut lexer = Lexer::new(&data);
-    while let Some(t) = lexer.next_token() {
-        match t {
-            Ok(token) => println!("{}", token),
-            Err(e) => println!("{}", e),
-        }
-    }
+    let lexer = Lexer::new(&data);
+    let mut parser = ParserT::new(lexer);
 
     Ok(())
 }
