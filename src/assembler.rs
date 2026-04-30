@@ -567,18 +567,199 @@ impl<'a> ParserT<'a> {
         Ok(p)
     }
 
+    fn generate_binary(&self) -> Result<Vec<u8>, LexerError> {
+        let mut mem = vec![0u8; 516];
+        let mut pc = self.symbols.program_counter as usize;
+        let program = self.program.as_ref().expect("Progam was not parsed yet.");
+
+        for (addr, value) in self.symbols.map.values() {
+            mem[(*addr as usize) * 2 + 4] = *value;
+        }
+
+        for instruction in &program.text {
+            match instruction {
+                Instruction::Nop => {
+                    mem[pc] = 0u8;
+                    pc += 2;
+                }
+                Instruction::Hlt => {
+                    mem[pc] = 240u8;
+                    pc += 2;
+                }
+                Instruction::Add(var_name) => {
+                    mem[pc] = 48;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Sta(var_name) => {
+                    mem[pc] = 16u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Lda(var_name) => {
+                    mem[pc] = 32u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Or(var_name) => {
+                    mem[pc] = 64u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::And(var_name) => {
+                    mem[pc] = 80u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Not(var_name) => {
+                    mem[pc] = 96u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Jmp(var_name) => {
+                    mem[pc] = 128u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Jn(var_name) => {
+                    mem[pc] = 144u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+                Instruction::Jz(var_name) => {
+                    mem[pc] = 160u8;
+                    pc += 2;
+
+                    match self.symbols.map.get(var_name) {
+                        Some(&item) => {
+                            mem[pc] = item.0;
+                            pc += 2;
+                        }
+                        None => {
+                            return Err(LexerError::new(format!(
+                                "Semantic error. Var '{}' was not defined.",
+                                var_name
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(mem)
+    }
+
     fn parse(&mut self) -> Result<(), LexerError> {
         let parsed_program = self.parse_program()?;
         self.symbols.build(&parsed_program.setup)?;
         self.program = Some(parsed_program);
+        self.generate_binary()?;
         Ok(())
     }
 }
 
+pub type Item = (u8, u8);
+
 #[derive(Debug)]
 pub struct SymbolTable {
     pub program_counter: u8,
-    pub map: HashMap<String, u8>,
+    pub map: HashMap<String, Item>,
 }
 
 impl SymbolTable {
@@ -594,7 +775,7 @@ impl SymbolTable {
 
         for decl in declarations {
             match decl {
-                DataDecl::Data(var, _value) => {
+                DataDecl::Data(var, value) => {
                     if self.map.contains_key(var) {
                         return Err(LexerError::new(format!(
                             "Semantic error. Var '{}' was already declared.",
@@ -602,7 +783,7 @@ impl SymbolTable {
                         )));
                     }
 
-                    self.map.insert(var.clone(), current_addr);
+                    self.map.insert(var.clone(), (current_addr, *value));
                     current_addr -= 1;
                 }
                 DataDecl::Space(var, size) => {
@@ -615,7 +796,7 @@ impl SymbolTable {
 
                     current_addr -= size - 1;
 
-                    self.map.insert(var.clone(), current_addr);
+                    self.map.insert(var.clone(), (current_addr, 0u8));
                 }
                 DataDecl::Org(addr) => {
                     if self.program_counter != 4 || *addr < 4u8 {
