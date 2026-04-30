@@ -290,10 +290,6 @@ impl<'a> ParserT<'a> {
         }
     }
 
-    fn peek(&self) -> Option<&Token<'a>> {
-        self.lookahead.as_ref()
-    }
-
     fn peek_kind(&self) -> Option<TokenType<'a>> {
         Some(self.lookahead.as_ref().unwrap().kind)
     }
@@ -431,7 +427,7 @@ impl<'a> ParserT<'a> {
         match self.peek_kind() {
             Some(TokenType::DataDeclaration(name)) => {
                 let extracted_name = name;
-                self.advance();
+                self.advance()?;
                 Ok(extracted_name)
             }
             Some(kind) => {
@@ -521,7 +517,7 @@ impl<'a> ParserT<'a> {
                     "add" => Ok(Instruction::Add(id.to_string())),
                     "lda" => Ok(Instruction::Lda(id.to_string())),
                     "sta" => Ok(Instruction::Sta(id.to_string())),
-                    "jmp" => Ok(Instruction::Sta(id.to_string())),
+                    "jmp" => Ok(Instruction::Jmp(id.to_string())),
                     "jn" => Ok(Instruction::Jn(id.to_string())),
                     "jz" => Ok(Instruction::Jz(id.to_string())),
                     "or" => Ok(Instruction::Or(id.to_string())),
@@ -564,10 +560,6 @@ impl<'a> ParserT<'a> {
         let p = Program { setup: data, text };
         Ok(p)
     }
-
-    fn parse(&mut self) -> Result<(), LexerError> {
-        Ok(())
-    }
 }
 
 impl Error for LexerError {}
@@ -591,6 +583,7 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
     let lexer = Lexer::new(&data);
     let mut parser = ParserT::new(lexer);
+    parser.parse_program()?;
 
     Ok(())
 }
