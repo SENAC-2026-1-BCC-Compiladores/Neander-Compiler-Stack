@@ -17,10 +17,10 @@ pub enum TokenType<'a> {
 
     // Variaveis
     Identfier(&'a str),
-    Variable(&'a str),
 
     // Instrucoes
     Instruction(&'a str),
+    DataDeclaration(&'a str),
 
     // Literais
     Num(u8),
@@ -44,9 +44,9 @@ enum Instruction {
     Sta(String),
     Hlt,
     Nop,
-    Jmp(u8),
-    Jz(u8),
-    Jn(u8),
+    Jmp(String),
+    Jz(String),
+    Jn(String),
     Not(String),
     Or(String),
     And(String),
@@ -68,8 +68,8 @@ impl<'a> fmt::Display for TokenType<'a> {
         let name = match self {
             TokenType::Label(_) => "Label",
             TokenType::Identfier(_) => "Identfier",
-            TokenType::Variable(_) => "Variable",
             TokenType::Semicolon => "Semicolon",
+            TokenType::DataDeclaration(_) => "Data Declaration",
             TokenType::Instruction(_) => "Instruction",
             TokenType::Num(_) => "Number",
             TokenType::NewLine => "New Line",
@@ -144,8 +144,10 @@ impl<'a> Lexer<'a> {
     fn get_reserved_token(lexeme: &'a str) -> TokenType<'a> {
         match lexeme {
             "setup" | "text" | "end" => TokenType::Label(lexeme),
-            "nop" | "DATA" | "SPACE" | "ORG" | "add" | "sta" | "lda" | "or" | "and" | "not"
-            | "jmp" | "jn" | "jz" | "hlt" => TokenType::Instruction(lexeme),
+            "DATA" | "SPACE" | "ORG" => TokenType::DataDeclaration(lexeme),
+            "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt" => {
+                TokenType::Instruction(lexeme)
+            }
             _ => TokenType::Identfier(lexeme),
         }
     }
@@ -425,16 +427,36 @@ impl<'a> ParserT<'a> {
         }
     }
 
+    fn expect_data_declaration(&mut self) -> Result<&'a str, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::DataDeclaration(name)) => {
+                let extracted_name = name;
+                self.advance();
+                Ok(extracted_name)
+            }
+            Some(kind) => {
+                let line = self.lookahead.as_ref().unwrap().line;
+                Err(LexerError::new(format!(
+                    "Syntax error at line {}. Expected data declaration, found '{}'.",
+                    line, kind
+                )))
+            }
+            None => Err(LexerError::new(
+                "Unexpected end of file at data section".into(),
+            )),
+        }
+    }
+
     fn parse_data_stmt(&mut self) -> Result<DataDecl, LexerError> {
         match self.peek_kind() {
-            Some(TokenType::Instruction("ORG")) => {
+            Some(TokenType::DataDeclaration("ORG")) => {
                 self.advance()?;
                 let num = self.expect_number()?;
                 Ok(DataDecl::Org(num))
             }
             Some(TokenType::Identfier(_)) => {
                 let id = self.expect_identifier()?;
-                let instr = self.expect_instruction()?;
+                let instr = self.expect_data_declaration()?;
                 match instr {
                     "DATA" => {
                         let num = self.expect_number()?;
@@ -490,23 +512,57 @@ impl<'a> ParserT<'a> {
 
     fn parse_instruction(&mut self) -> Result<Instruction, LexerError> {
         let instr = self.expect_instruction()?;
-        let i = Instruction::Nop;
-        Ok(i)
+        match instr {
+            "hlt" => Ok(Instruction::Hlt),
+            "nop" => Ok(Instruction::Nop),
+            _ => {
+                let id = self.expect_identifier()?;
+                match instr {
+                    "add" => Ok(Instruction::Add(id.to_string())),
+                    "lda" => Ok(Instruction::Lda(id.to_string())),
+                    "sta" => Ok(Instruction::Sta(id.to_string())),
+                    "jmp" => Ok(Instruction::Sta(id.to_string())),
+                    "jn" => Ok(Instruction::Jn(id.to_string())),
+                    "jz" => Ok(Instruction::Jz(id.to_string())),
+                    "or" => Ok(Instruction::Or(id.to_string())),
+                    "not" => Ok(Instruction::Not(id.to_string())),
+                    "and" => Ok(Instruction::And(id.to_string())),
+                    _ => Err(LexerError::new(format!(
+                        "Expected 'instruction' at line {}, but found token '{}'",
+                        self.lookahead.as_ref().unwrap().line,
+                        instr
+                    ))),
+                }
+            }
+        }
     }
 
     fn parse_text(&mut self) -> Result<Vec<Instruction>, LexerError> {
-        let instructions = Vec::<Instruction>::new();
+        let mut instructions = Vec::<Instruction>::new();
         self.expect_label("text")?;
-
+        while let Some(kind) = self.peek_kind() {
+            match kind {
+                TokenType::Label("end") => break,
+                TokenType::NewLine => self.advance()?,
+                _ => {
+                    let instr = self.parse_instruction()?;
+                    instructions.push(instr);
+                }
+            }
+        }
         self.expect_label("end")?;
         Ok(instructions)
     }
 
-    fn parse_program(&mut self) -> Result<(), LexerError> {
+    fn parse_program(&mut self) -> Result<Program, LexerError> {
         self.consume_blanks()?;
-        self.parse_data()?;
+        let data = self.parse_data()?;
+
         self.consume_blanks()?;
-        Ok(())
+        let text = self.parse_text()?;
+
+        let p = Program { setup: data, text };
+        Ok(p)
     }
 
     fn parse(&mut self) -> Result<(), LexerError> {
@@ -563,5 +619,39 @@ mod tests {
         assert_eq!(statements[0], DataDecl::Data("A".to_string(), 44));
         assert_eq!(statements[1], DataDecl::Org(4));
         assert_eq!(statements[2], DataDecl::Space("B".to_string(), 5));
+    }
+
+    #[test]
+    fn test_parse_program() {
+        use super::*;
+
+        let source =
+            "setup\n A DATA 44\n ORG 4\n B SPACE 5\n end\n text\n add A\n and A\n hlt\n end";
+        let lexer = Lexer::new(source);
+        let mut parser = ParserT::new(lexer);
+
+        let result = parser.parse_program();
+
+        assert!(
+            result.is_ok(),
+            "Error returned from parser: {:?}",
+            result.err()
+        );
+
+        let p = result.unwrap();
+
+        let statements = p.setup;
+        assert_eq!(statements.len(), 3);
+
+        assert_eq!(statements[0], DataDecl::Data("A".to_string(), 44));
+        assert_eq!(statements[1], DataDecl::Org(4));
+        assert_eq!(statements[2], DataDecl::Space("B".to_string(), 5));
+
+        let instructions = p.text;
+        assert_eq!(instructions.len(), 3);
+
+        assert_eq!(instructions[0], Instruction::Add("A".to_string()));
+        assert_eq!(instructions[1], Instruction::And("A".to_string()));
+        assert_eq!(instructions[2], Instruction::Hlt);
     }
 }
