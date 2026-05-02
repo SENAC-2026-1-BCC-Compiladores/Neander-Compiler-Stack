@@ -339,166 +339,34 @@ impl<'a> ParserT<'a> {
         }
 
         for instruction in &program.text {
-            match instruction {
-                Instruction::Nop => {
-                    mem[pc] = 0u8;
-                    pc += 2;
-                }
-                Instruction::Hlt => {
-                    mem[pc] = 240u8;
-                    pc += 2;
-                }
-                Instruction::Add(var_name) => {
-                    mem[pc] = 48;
-                    pc += 2;
+            let (opcode, opt_var) = match instruction {
+                Instruction::Nop => (0u8, None),
+                Instruction::Hlt => (240u8, None),
+                Instruction::Add(v) => (48u8, Some(v)),
+                Instruction::Sta(v) => (16u8, Some(v)),
+                Instruction::Lda(v) => (32u8, Some(v)),
+                Instruction::Or(v) => (64u8, Some(v)),
+                Instruction::And(v) => (80u8, Some(v)),
+                Instruction::Not(v) => (96u8, Some(v)),
+                Instruction::Jmp(v) => (128u8, Some(v)),
+                Instruction::Jn(v) => (144u8, Some(v)),
+                Instruction::Jz(v) => (160u8, Some(v)),
+            };
 
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
+            mem[pc] = opcode;
+            pc += 2;
+
+            if let Some(var_name) = opt_var {
+                match self.symbols.map.get(var_name) {
+                    Some(&item) => {
+                        mem[pc] = item.0;
+                        pc += 2;
                     }
-                }
-                Instruction::Sta(var_name) => {
-                    mem[pc] = 16u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::Lda(var_name) => {
-                    mem[pc] = 32u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::Or(var_name) => {
-                    mem[pc] = 64u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::And(var_name) => {
-                    mem[pc] = 80u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::Not(var_name) => {
-                    mem[pc] = 96u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::Jmp(var_name) => {
-                    mem[pc] = 128u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::Jn(var_name) => {
-                    mem[pc] = 144u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
-                    }
-                }
-                Instruction::Jz(var_name) => {
-                    mem[pc] = 160u8;
-                    pc += 2;
-
-                    match self.symbols.map.get(var_name) {
-                        Some(&item) => {
-                            mem[pc] = item.0;
-                            pc += 2;
-                        }
-                        None => {
-                            return Err(LexerError::new(format!(
-                                "Semantic error. Var '{}' was not defined.",
-                                var_name
-                            )));
-                        }
+                    None => {
+                        return Err(LexerError::new(format!(
+                            "Semantic error. Var '{}' was not found.",
+                            var_name
+                        )));
                     }
                 }
             }
