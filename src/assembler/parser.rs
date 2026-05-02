@@ -137,14 +137,14 @@ impl<'a> ParserT<'a> {
                 Ok(())
             }
             Some(kind) => {
-                let line = self.lookahead.as_ref().unwrap().line;
+                let line = self.current_line();
                 Err(LexerError::new(format!(
                     "Syntax error at {}, expected label '{}', but found {}",
                     line, expected_label, kind
                 )))
             }
             None => {
-                let line = self.lookahead.as_ref().unwrap().line;
+                let line = self.current_line();
                 Err(LexerError::new(format!(
                     "Unexpected end of file. Expected label '{}' at line {}",
                     expected_label, line
@@ -199,7 +199,7 @@ impl<'a> ParserT<'a> {
                         Ok(DataDecl::Space(id.to_string(), num))
                     }
                     _ => {
-                        let line = self.lookahead.as_ref().map_or(0, |t| t.line);
+                        let line = self.current_line();
                         Err(LexerError::new(format!(
                             "Error at line {}. Expected 'DATA' or 'SPACE' but found '{}'",
                             line, instr
@@ -208,7 +208,7 @@ impl<'a> ParserT<'a> {
                 }
             }
             Some(kind) => {
-                let line = self.lookahead.as_ref().unwrap().line;
+                let line = self.current_line();
                 Err(LexerError::new(format!(
                     "Unexpected token at line {}. Expected data statement, but found '{}'",
                     line, kind
@@ -244,7 +244,7 @@ impl<'a> ParserT<'a> {
                     "and" => Ok(Instruction::And(id.to_string())),
                     _ => Err(LexerError::new(format!(
                         "Expected 'instruction' at line {}, but found token '{}'",
-                        self.lookahead.as_ref().unwrap().line,
+                        self.current_line(),
                         instr
                     ))),
                 }
@@ -267,13 +267,13 @@ impl<'a> ParserT<'a> {
         Ok(p)
     }
 
-    fn generate_binary(&self) -> Result<Vec<u8>, LexerError> {
-        let mut mem = vec![0u8; 516];
+    fn generate_binary(&self) -> Result<[u8; 256], LexerError> {
+        let mut mem = [0; 256];
         let mut pc = self.symbols.program_counter as usize;
         let program = self.program.as_ref().expect("Progam was not parsed yet.");
 
         for (addr, value) in self.symbols.map.values() {
-            mem[(*addr as usize) * 2 + 4] = *value;
+            mem[*addr as usize] = *value;
         }
 
         for instruction in &program.text {
@@ -292,13 +292,13 @@ impl<'a> ParserT<'a> {
             };
 
             mem[pc] = opcode;
-            pc += 2;
+            pc += 1;
 
             if let Some(var_name) = opt_var {
                 match self.symbols.map.get(var_name) {
                     Some(&item) => {
                         mem[pc] = item.0;
-                        pc += 2;
+                        pc += 1;
                     }
                     None => {
                         return Err(LexerError::new(format!(
@@ -318,9 +318,19 @@ impl<'a> ParserT<'a> {
         self.symbols.build(&parsed_program.setup)?;
         self.program = Some(parsed_program);
         let bin = self.generate_binary()?;
-        println!("{:?}", bin);
+        print_bin(&bin);
         Ok(())
     }
+}
+
+pub fn print_bin(bin: &[u8]) {
+    for chunk in bin.chunks(16) {
+        for byte in chunk {
+            print!(" {:02}", byte);
+        }
+        println!();
+    }
+    println!();
 }
 
 pub type Item = (u8, u8);
@@ -334,7 +344,7 @@ pub struct SymbolTable {
 impl SymbolTable {
     pub fn new() -> Self {
         Self {
-            program_counter: 4,
+            program_counter: 0,
             map: HashMap::new(),
         }
     }
@@ -368,7 +378,7 @@ impl SymbolTable {
                     self.map.insert(var.clone(), (current_addr, 0u8));
                 }
                 DataDecl::Org(addr) => {
-                    if self.program_counter != 4 || *addr < 4u8 {
+                    if self.program_counter != 0 {
                         return Err(LexerError::new(
                             "Semantic error. Program count was already set.".into(),
                         ));
