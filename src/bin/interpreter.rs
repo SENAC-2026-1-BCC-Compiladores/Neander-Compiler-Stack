@@ -8,7 +8,9 @@ use std::io;
 struct Cli {
     #[arg(long, short)]
     path: Option<String>,
-    pc: Option<u16>,
+
+    #[arg(long, short)]
+    pc: Option<u8>,
 }
 
 pub fn main() -> Result<(), Box<dyn Error>> {

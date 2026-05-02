@@ -1,38 +1,14 @@
-use clap::Parser;
-use std::error::Error;
 use std::fmt::{self};
-use std::fs::{self};
-use std::io;
 
 type InstructionFn = fn(&mut Interpreter, addr: usize);
-struct ProgramCounter(u16);
-
-impl ProgramCounter {
-    fn usize(&self) -> usize {
-        self.0 as usize
-    }
-
-    fn increment(&mut self) {
-        self.0 = self.0.saturating_add(2);
-    }
-}
 
 pub struct Interpreter {
     pub acc: u8,
     pub zero_f: bool,
     pub negative_f: bool,
-    pub mem: Vec<u8>,
-    pc: ProgramCounter,
-    should_stop: bool,
-}
-
-#[derive(Parser)]
-struct Cli {
-    #[arg(long, short)]
-    path: Option<String>,
-
-    #[arg(long, short)]
-    pc: Option<u16>,
+    pub mem: [u8; 256],
+    pub pc: u8,
+    pub should_stop: bool,
 }
 
 fn nop(_i: &mut Interpreter, _addr: usize) {
@@ -67,9 +43,7 @@ fn not(i: &mut Interpreter, _addr: usize) {
 }
 
 fn jmp(i: &mut Interpreter, addr: usize) {
-    println!("função jmp chamada para o endereço: {}", addr);
-    println!("mem: {}", i.mem[addr]);
-    i.pc.0 = addr as u16;
+    i.pc = addr as u8;
 }
 
 fn jn(i: &mut Interpreter, addr: usize) {
@@ -92,21 +66,16 @@ impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
             acc: 0,
-            pc: ProgramCounter(4),
+            pc: 0,
             zero_f: true,
             negative_f: false,
-            mem: vec![0],
+            mem: [0; 256],
             should_stop: false,
         }
     }
 
-    pub fn set_mem(mut self, mem: Vec<u8>) -> Self {
-        self.mem = mem;
-        self
-    }
-
-    pub fn set_pc(mut self, pc: u16) -> Self {
-        self.pc.0 = pc;
+    pub fn set_pc(mut self, pc: u8) -> Self {
+        self.pc = pc;
         self
     }
 
@@ -128,13 +97,13 @@ impl Interpreter {
     }
 
     fn fetch(&mut self) -> u8 {
-        let code = self.mem[self.pc.usize()];
-        self.pc.increment();
+        let code = self.mem[self.pc as usize];
+        self.pc = self.pc.wrapping_add(1);
         code
     }
 
     pub fn run(&mut self) {
-        while self.pc.usize() < self.mem.len() && !self.should_stop {
+        while (self.pc as usize) < self.mem.len() && !self.should_stop {
             // println!("pc: {}", self.pc.usize() * 2);
             let opcode = self.fetch();
 
@@ -161,7 +130,7 @@ impl Default for Interpreter {
 
 impl fmt::Display for Interpreter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Interpreter: \n ACC: {}\n PC: {}\n", self.acc, self.pc.0)?;
+        write!(f, "Interpreter: \n ACC: {}\n PC: {}\n", self.acc, self.pc)?;
 
         for chunk in self.mem.chunks(16) {
             for byte in chunk {
@@ -172,27 +141,4 @@ impl fmt::Display for Interpreter {
 
         writeln!(f)
     }
-}
-
-pub fn main() -> Result<(), Box<dyn Error>> {
-    let cli = Cli::parse();
-    let data: Vec<u8>;
-    let mut buff = String::new();
-
-    if let Some(p) = cli.path {
-        data = fs::read(p)?;
-    } else {
-        io::stdin().read_line(&mut buff)?;
-        let file_name = buff.trim().replace("\"", "");
-        data = fs::read(file_name)?;
-    }
-
-    let mut interpreter = Interpreter::new().set_mem(data);
-
-    if let Some(program_counter) = cli.pc {
-        interpreter = Interpreter::set_pc(interpreter, program_counter);
-    }
-    interpreter.run();
-
-    Ok(())
 }
