@@ -1,34 +1,5 @@
-use clap::Parser;
+use crate::assembler::*;
 use std::collections::HashMap;
-use std::error::Error;
-use std::io::Read;
-use std::{fmt, fs, io};
-
-#[derive(Parser)]
-struct Cli {
-    #[arg(long, short)]
-    path: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TokenType<'a> {
-    // Delimitadores Iniciadores
-    Label(&'a str),
-
-    // Variaveis
-    Identfier(&'a str),
-
-    // Instrucoes
-    Instruction(&'a str),
-    DataDeclaration(&'a str),
-
-    // Literais
-    Num(u8),
-
-    // Simbolos unicos
-    Semicolon,
-    NewLine,
-}
 
 #[derive(Debug, PartialEq)]
 enum DataDecl {
@@ -52,221 +23,12 @@ enum Instruction {
     And(String),
 }
 
-struct Program {
+pub struct Program {
     setup: Vec<DataDecl>,
     text: Vec<Instruction>,
 }
 
-impl<'a> fmt::Display for TokenType<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
-            TokenType::Label(_) => "Label",
-            TokenType::Identfier(_) => "Identfier",
-            TokenType::Semicolon => "Semicolon",
-            TokenType::DataDeclaration(_) => "Data Declaration",
-            TokenType::Instruction(_) => "Instruction",
-            TokenType::Num(_) => "Number",
-            TokenType::NewLine => "New Line",
-        };
-
-        write!(f, "{}", name)
-    }
-}
-
-#[derive(PartialEq)]
-pub struct Token<'a> {
-    kind: TokenType<'a>,
-    lexeme: &'a str,
-    line: usize,
-}
-
-impl<'a> Token<'a> {
-    fn new(kind: TokenType<'a>, lexeme: &'a str, line: usize) -> Self {
-        Token { kind, lexeme, line }
-    }
-}
-
-impl<'a> fmt::Display for Token<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Token -> \n\tTipo: {} \n\tLexeme: {} \n\tLine: {}",
-            self.kind,
-            self.lexeme.escape_debug(),
-            self.line
-        )
-    }
-}
-
-pub struct Lexer<'a> {
-    stream: &'a str,
-    pub tokens: Vec<Token<'a>>,
-    pub position: usize,
-    pub cursor: usize,
-    pub error: bool,
-    pub line: usize,
-    pub col: usize,
-}
-
-impl<'a> Lexer<'a> {
-    fn new(stream: &'a str) -> Self {
-        Lexer {
-            stream,
-            tokens: vec![],
-            position: 0,
-            cursor: 0,
-            error: false,
-            line: 1,
-            col: 1,
-        }
-    }
-
-    fn peek(&self) -> Option<char> {
-        self.stream[self.position..].chars().next()
-    }
-
-    fn consume(&mut self) -> Option<char> {
-        if let Some(c) = self.peek() {
-            self.position += c.len_utf8();
-            self.col += 1;
-            Some(c)
-        } else {
-            None
-        }
-    }
-
-    fn get_reserved_token(lexeme: &'a str) -> TokenType<'a> {
-        match lexeme {
-            "setup" | "text" | "end" => TokenType::Label(lexeme),
-            "DATA" | "SPACE" | "ORG" => TokenType::DataDeclaration(lexeme),
-            "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt" => {
-                TokenType::Instruction(lexeme)
-            }
-            _ => TokenType::Identfier(lexeme),
-        }
-    }
-
-    fn skip_blank(&mut self) {
-        while let Some(' ' | '\t') = self.peek() {
-            self.consume();
-        }
-    }
-
-    fn new_line(&mut self) -> Result<Token<'a>, LexerError> {
-        // consuming the first '\n'
-        self.consume();
-        self.line += 1;
-        self.col = 1;
-
-        // check for others \n
-        while let Some(c) = self.peek() {
-            if c != '\n' {
-                break;
-            }
-            self.consume();
-            self.line += 1;
-            self.col = 1;
-        }
-
-        Ok(Token::new(TokenType::NewLine, "\n", self.line))
-    }
-
-    fn ignore_comments(&mut self) {
-        if let Some(';') = self.peek() {
-            self.consume();
-
-            while let Some(stop) = self.peek() {
-                if stop == '\n' {
-                    break;
-                } else {
-                    self.consume();
-                }
-            }
-        }
-    }
-
-    fn consume_alpha(&mut self) -> Result<Token<'a>, LexerError> {
-        let start_idx = self.position;
-
-        while let Some(c) = self.peek() {
-            if !c.is_alphabetic() {
-                break;
-            } else {
-                self.consume();
-            }
-        }
-
-        let kind = Lexer::get_reserved_token(&self.stream[start_idx..self.position]);
-        Ok(Token::new(
-            kind,
-            &self.stream[start_idx..self.position],
-            self.line,
-        ))
-    }
-
-    fn consume_numeric(&mut self) -> Result<Token<'a>, LexerError> {
-        let start_idx = self.position;
-
-        while let Some(c) = self.peek() {
-            if !c.is_ascii_digit() {
-                break;
-            } else {
-                self.consume();
-            }
-        }
-
-        let lex_str = &self.stream[start_idx..self.position];
-        match lex_str.parse::<u8>() {
-            Ok(num) => Ok(Token::new(TokenType::Num(num), lex_str, self.line)),
-            Err(_) => {
-                let str_error = format!(
-                    "Error: number '{}' out of bounds expected (0-255) at: {}:{}",
-                    lex_str, self.line, self.col
-                );
-                Err(LexerError::new(str_error))
-            }
-        }
-    }
-
-    fn next_token(&mut self) -> Option<Result<Token<'a>, LexerError>> {
-        self.skip_blank();
-        self.ignore_comments();
-        let c = self.peek()?;
-        match c {
-            '\n' => Some(self.new_line()),
-            c if c.is_alphabetic() => Some(self.consume_alpha()),
-            c if c.is_numeric() => Some(self.consume_numeric()),
-            _ => {
-                let error_str = format!(
-                    "Error: unexpected symbol '{}' at {}:{}",
-                    c, self.line, self.col
-                );
-                Some(Err(LexerError::new(error_str)))
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LexerError {
-    message: String,
-}
-
-impl LexerError {
-    fn new(error: String) -> Self {
-        LexerError { message: error }
-    }
-}
-
-impl fmt::Display for LexerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ERROR: {}", self.message)
-    }
-}
-
-impl Error for LexerError {}
-
-struct ParserT<'a> {
+pub struct ParserT<'a> {
     pub lexer: Lexer<'a>,
     pub lookahead: Option<Token<'a>>,
     pub valid: bool,
@@ -275,7 +37,7 @@ struct ParserT<'a> {
 }
 
 impl<'a> ParserT<'a> {
-    fn new(mut lexer: Lexer<'a>) -> Self {
+    pub fn new(mut lexer: Lexer<'a>) -> Self {
         let next_t = lexer.next_token();
 
         let (first_token, is_valid) = match next_t {
@@ -745,7 +507,7 @@ impl<'a> ParserT<'a> {
         Ok(mem)
     }
 
-    fn parse(&mut self) -> Result<(), LexerError> {
+    pub fn parse(&mut self) -> Result<(), LexerError> {
         let parsed_program = self.parse_program()?;
         self.symbols.build(&parsed_program.setup)?;
         self.program = Some(parsed_program);
@@ -815,90 +577,5 @@ impl SymbolTable {
 impl Default for SymbolTable {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-pub fn main() -> Result<(), Box<dyn Error>> {
-    let cli = Cli::parse();
-    let data: String;
-    let mut buff = String::new();
-
-    // path para arquivo .asm
-    if let Some(path) = cli.path {
-        data = fs::read_to_string(path)?;
-    } else {
-        io::stdin().read_to_string(&mut buff)?;
-        if buff.trim().is_empty() {
-            return Err("Erro: Arquivo fornecido vazio ou inexistente".into());
-        }
-
-        data = buff;
-    }
-
-    let lexer = Lexer::new(&data);
-    let mut parser = ParserT::new(lexer);
-    parser.parse()?;
-
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_data_section() {
-        let source = "setup\n\n\n\n A DATA 44\n\n\n\n\n\n ORG 4\n\n B SPACE 5\n\n end";
-        let lexer = Lexer::new(source);
-        let mut parser = ParserT::new(lexer);
-
-        let result = parser.parse_data();
-
-        assert!(
-            result.is_ok(),
-            "Error returned from parser: {:?}",
-            result.err()
-        );
-
-        let statements = result.unwrap();
-        assert_eq!(statements.len(), 3);
-
-        assert_eq!(statements[0], DataDecl::Data("A".to_string(), 44));
-        assert_eq!(statements[1], DataDecl::Org(4));
-        assert_eq!(statements[2], DataDecl::Space("B".to_string(), 5));
-    }
-
-    #[test]
-    fn test_parse_program() {
-        use super::*;
-
-        let source =
-            "setup\n A DATA 44\n ORG 4\n B SPACE 5\n end\n text\n add A\n and A\n hlt\n end";
-        let lexer = Lexer::new(source);
-        let mut parser = ParserT::new(lexer);
-
-        let result = parser.parse_program();
-
-        assert!(
-            result.is_ok(),
-            "Error returned from parser: {:?}",
-            result.err()
-        );
-
-        let p = result.unwrap();
-
-        let statements = p.setup;
-        assert_eq!(statements.len(), 3);
-
-        assert_eq!(statements[0], DataDecl::Data("A".to_string(), 44));
-        assert_eq!(statements[1], DataDecl::Org(4));
-        assert_eq!(statements[2], DataDecl::Space("B".to_string(), 5));
-
-        let instructions = p.text;
-        assert_eq!(instructions.len(), 3);
-
-        assert_eq!(instructions[0], Instruction::Add("A".to_string()));
-        assert_eq!(instructions[1], Instruction::And("A".to_string()));
-        assert_eq!(instructions[2], Instruction::Hlt);
     }
 }

@@ -4,16 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "interpreter"
-path = "src/interpreter.rs"
-
-[[bin]]
 name = "assembler"
-path = "src/assembler.rs"
+path = "src/bin/assembler.rs"
 
 [[bin]]
-name = "bnf"
-path = "src/bnf.rs"
+name = "interpreter"
+path = "src/bin/interpreter.rs"
 
 [dependencies]
 clap = { version = "4.6.0", features = ["derive"] }

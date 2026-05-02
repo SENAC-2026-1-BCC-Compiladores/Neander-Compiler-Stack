@@ -89,7 +89,7 @@ fn hlt(i: &mut Interpreter, _addr: usize) {
 }
 
 impl Interpreter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Interpreter {
             acc: 0,
             pc: ProgramCounter(4),
@@ -100,12 +100,12 @@ impl Interpreter {
         }
     }
 
-    fn set_mem(mut self, mem: Vec<u8>) -> Self {
+    pub fn set_mem(mut self, mem: Vec<u8>) -> Self {
         self.mem = mem;
         self
     }
 
-    fn set_pc(mut self, pc: u16) -> Self {
+    pub fn set_pc(mut self, pc: u16) -> Self {
         self.pc.0 = pc;
         self
     }
@@ -133,7 +133,7 @@ impl Interpreter {
         code
     }
 
-    fn run(&mut self) {
+    pub fn run(&mut self) {
         while self.pc.usize() < self.mem.len() && !self.should_stop {
             // println!("pc: {}", self.pc.usize() * 2);
             let opcode = self.fetch();
@@ -150,6 +150,12 @@ impl Interpreter {
                 continue;
             }
         }
+    }
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
