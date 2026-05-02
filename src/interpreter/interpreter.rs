@@ -26,7 +26,6 @@ fn lda(i: &mut Interpreter, addr: usize) {
 }
 
 fn add(i: &mut Interpreter, addr: usize) {
-    println!("Função soma chamada para o endereço: {}", addr);
     i.acc += i.mem[addr];
 }
 
@@ -74,6 +73,21 @@ impl Interpreter {
         }
     }
 
+    pub fn load_neander_file(mut self, file_data: &[u8]) -> Result<Self, String> {
+        if file_data.len() != 516 {
+            return Err("Invalid file. The length of file wasn't 516 bytes.".to_string());
+        }
+        if file_data[0..4] != [3, 78, 68, 82] {
+            return Err("Invalid header format.".to_string());
+        }
+
+        for i in 0..256 {
+            self.mem[i] = file_data[4 + (i * 2)];
+        }
+
+        Ok(self)
+    }
+
     pub fn set_pc(mut self, pc: u8) -> Self {
         self.pc = pc;
         self
@@ -104,7 +118,6 @@ impl Interpreter {
 
     pub fn run(&mut self) {
         while (self.pc as usize) < self.mem.len() && !self.should_stop {
-            // println!("pc: {}", self.pc.usize() * 2);
             let opcode = self.fetch();
 
             if let Some(function) = Interpreter::get_rules(opcode) {
@@ -113,7 +126,7 @@ impl Interpreter {
                     continue;
                 }
 
-                let addr = (self.fetch() as usize) * 2 + 4;
+                let addr = self.fetch() as usize;
                 function(self, addr);
             } else {
                 continue;
