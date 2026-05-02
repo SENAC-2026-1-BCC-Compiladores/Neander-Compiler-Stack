@@ -36,6 +36,29 @@ pub struct ParserT<'a> {
     pub program: Option<Program>,
 }
 
+macro_rules! expect_token {
+    ($self:ident, $pattern:pat => $extracted:expr, $err_expected:expr) => {
+        match $self.peek_kind() {
+            Some($pattern) => {
+                let res = $extracted;
+                $self.advance()?;
+                Ok(res)
+            }
+            Some(wrong_kind) => {
+                let line = $self.current_line();
+                Err(LexerError::new(format!(
+                    "Syntax error at line {}. Expected {}, but found '{}'.",
+                    line, $err_expected, wrong_kind
+                )))
+            }
+            None => Err(LexerError::new(format!(
+                "Unexpected end of file. Expecting {}",
+                $err_expected
+            ))),
+        }
+    };
+}
+
 impl<'a> ParserT<'a> {
     pub fn new(mut lexer: Lexer<'a>) -> Self {
         let next_t = lexer.next_token();
@@ -60,6 +83,10 @@ impl<'a> ParserT<'a> {
 
     fn peek_kind(&self) -> Option<TokenType<'a>> {
         Some(self.lookahead.as_ref().unwrap().kind)
+    }
+
+    fn current_line(&self) -> usize {
+        self.lookahead.as_ref().map_or(self.lexer.line, |t| t.line)
     }
 
     fn advance(&mut self) -> Result<(), LexerError> {
@@ -87,45 +114,20 @@ impl<'a> ParserT<'a> {
         Ok(())
     }
 
-    fn expect(&mut self, expected: TokenType<'a>) -> Result<(), LexerError> {
-        match self.peek_kind() {
-            Some(kind) if kind == expected => {
-                self.advance()?;
-                Ok(())
-            }
-            Some(t) => {
-                let line = self.lookahead.as_ref().unwrap().line;
-                let str_error = format!(
-                    "Syntax error at {} expected '{}' but found '{}'",
-                    line, expected, t
-                );
-                Err(LexerError::new(str_error))
-            }
-            None => Err(LexerError::new(format!(
-                "Unexpected end of file. Expected {}",
-                expected
-            ))),
-        }
+    fn expect_identifier(&mut self) -> Result<&'a str, LexerError> {
+        expect_token!(self, TokenType::Identfier(name) => name, "Identifier")
     }
 
-    fn expect_identifier(&mut self) -> Result<&'a str, LexerError> {
-        match self.peek_kind() {
-            Some(TokenType::Identfier(name)) => {
-                let extrected_name = name;
-                self.advance()?;
-                Ok(extrected_name)
-            }
-            Some(kind) => {
-                let line = self.lookahead.as_ref().unwrap().line;
-                Err(LexerError::new(format!(
-                    "Syntax error at {}, expected Identifier, found {}",
-                    line, kind
-                )))
-            }
-            None => Err(LexerError::new(
-                "End of file, expected identifier".to_string(),
-            )),
-        }
+    fn expect_number(&mut self) -> Result<u8, LexerError> {
+        expect_token!(self, TokenType::Num(num) => num, "u8 number (0-255)")
+    }
+
+    fn expect_instruction(&mut self) -> Result<&'a str, LexerError> {
+        expect_token!(self, TokenType::Instruction(instr) => instr, "instruction")
+    }
+
+    fn expect_data_declaration(&mut self) -> Result<&'a str, LexerError> {
+        expect_token!(self, TokenType::DataDeclaration(decl) => decl, "data statement")
     }
 
     fn expect_label(&mut self, expected_label: &str) -> Result<(), LexerError> {
@@ -151,64 +153,30 @@ impl<'a> ParserT<'a> {
         }
     }
 
-    fn expect_number(&mut self) -> Result<u8, LexerError> {
-        match self.peek_kind() {
-            Some(TokenType::Num(value)) => {
-                let extracted_number = value;
-                self.advance()?;
-                Ok(extracted_number)
-            }
-            Some(kind) => {
-                let line = self.lookahead.as_ref().unwrap().line;
-                Err(LexerError::new(format!(
-                    "Syntax error at line {}. Expected 'u8' number, found {}",
-                    line, kind
-                )))
-            }
-            None => Err(LexerError::new(
-                "Unexpected end of file. Expected 'u8' number".into(),
-            )),
-        }
-    }
+    fn parse_section<T, F>(
+        &mut self,
+        secntion_name: &str,
+        mut parse_item: F,
+    ) -> Result<Vec<T>, LexerError>
+    where
+        F: FnMut(&mut Self) -> Result<T, LexerError>,
+    {
+        let mut items = Vec::new();
+        self.expect_label(secntion_name)?;
+        self.consume_blanks()?;
 
-    fn expect_instruction(&mut self) -> Result<&'a str, LexerError> {
-        match self.peek_kind() {
-            Some(TokenType::Instruction(name)) => {
-                let extracted_name = name;
-                self.advance()?;
-                Ok(extracted_name)
+        while let Some(kind) = self.peek_kind() {
+            match kind {
+                TokenType::Label("end") => break,
+                TokenType::NewLine => self.advance()?,
+                _ => {
+                    items.push(parse_item(self)?);
+                }
             }
-            Some(kind) => {
-                let line = self.lookahead.as_ref().unwrap().line;
-                Err(LexerError::new(format!(
-                    "Syntax error at line {}. Expected instruction found {}",
-                    line, kind
-                )))
-            }
-            None => Err(LexerError::new(
-                "Unexpected end of file. Expected Instruction".into(),
-            )),
         }
-    }
 
-    fn expect_data_declaration(&mut self) -> Result<&'a str, LexerError> {
-        match self.peek_kind() {
-            Some(TokenType::DataDeclaration(name)) => {
-                let extracted_name = name;
-                self.advance()?;
-                Ok(extracted_name)
-            }
-            Some(kind) => {
-                let line = self.lookahead.as_ref().unwrap().line;
-                Err(LexerError::new(format!(
-                    "Syntax error at line {}. Expected data declaration, found '{}'.",
-                    line, kind
-                )))
-            }
-            None => Err(LexerError::new(
-                "Unexpected end of file at data section".into(),
-            )),
-        }
+        self.expect_label("end")?;
+        Ok(items)
     }
 
     fn parse_data_stmt(&mut self) -> Result<DataDecl, LexerError> {
@@ -253,29 +221,12 @@ impl<'a> ParserT<'a> {
     }
 
     fn parse_data(&mut self) -> Result<Vec<DataDecl>, LexerError> {
-        let mut data_statements = Vec::<DataDecl>::new();
-        self.expect_label("setup")?;
-        self.expect(TokenType::NewLine)?;
-
-        while let Some(kind) = self.peek_kind() {
-            match kind {
-                TokenType::Label("end") => break,
-                TokenType::NewLine => {
-                    self.advance()?;
-                }
-                _ => {
-                    let data = self.parse_data_stmt()?;
-                    data_statements.push(data);
-                }
-            }
-        }
-
-        self.expect_label("end")?;
-        Ok(data_statements)
+        self.parse_section("setup", |parser| parser.parse_data_stmt())
     }
 
     fn parse_instruction(&mut self) -> Result<Instruction, LexerError> {
         let instr = self.expect_instruction()?;
+
         match instr {
             "hlt" => Ok(Instruction::Hlt),
             "nop" => Ok(Instruction::Nop),
@@ -302,20 +253,7 @@ impl<'a> ParserT<'a> {
     }
 
     fn parse_text(&mut self) -> Result<Vec<Instruction>, LexerError> {
-        let mut instructions = Vec::<Instruction>::new();
-        self.expect_label("text")?;
-        while let Some(kind) = self.peek_kind() {
-            match kind {
-                TokenType::Label("end") => break,
-                TokenType::NewLine => self.advance()?,
-                _ => {
-                    let instr = self.parse_instruction()?;
-                    instructions.push(instr);
-                }
-            }
-        }
-        self.expect_label("end")?;
-        Ok(instructions)
+        self.parse_section("text", |parser| parser.parse_instruction())
     }
 
     fn parse_program(&mut self) -> Result<Program, LexerError> {
@@ -379,7 +317,8 @@ impl<'a> ParserT<'a> {
         let parsed_program = self.parse_program()?;
         self.symbols.build(&parsed_program.setup)?;
         self.program = Some(parsed_program);
-        self.generate_binary()?;
+        let bin = self.generate_binary()?;
+        println!("{:?}", bin);
         Ok(())
     }
 }
