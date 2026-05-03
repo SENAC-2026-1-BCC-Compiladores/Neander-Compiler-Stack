@@ -313,13 +313,24 @@ impl<'a> ParserT<'a> {
         Ok(mem)
     }
 
-    pub fn parse(&mut self) -> Result<(), LexerError> {
+    fn transform_bin(&self, bin: &[u8]) -> [u8; 516] {
+        let mut out_bin: [u8; 516] = [0; 516];
+
+        out_bin[0..4].copy_from_slice(&[3, 78, 68, 82]);
+
+        for i in 0..256 {
+            out_bin[i * 2 + 4] = bin[i];
+        }
+
+        out_bin
+    }
+
+    pub fn parse(&mut self) -> Result<[u8; 516], LexerError> {
         let parsed_program = self.parse_program()?;
         self.symbols.build(&parsed_program.setup)?;
         self.program = Some(parsed_program);
-        let bin = self.generate_binary()?;
-        print_bin(&bin);
-        Ok(())
+        let bin = self.transform_bin(&self.generate_binary()?);
+        Ok(bin)
     }
 }
 
