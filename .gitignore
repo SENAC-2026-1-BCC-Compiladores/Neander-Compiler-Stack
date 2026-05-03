@@ -1,3 +1,4 @@
 /target
 *.txt
 !utils/*.txt
+*.MEM
