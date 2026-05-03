@@ -6,7 +6,7 @@ pub enum TokenType {
     Plus,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct Token {
     pub kind: TokenType,
     pub pos: usize,
@@ -48,7 +48,7 @@ impl<'a> Lexer<'a> {
         Lexer {
             stream,
             pos: 0,
-            col: 0,
+            col: 1,
         }
     }
 
@@ -59,6 +59,7 @@ impl<'a> Lexer<'a> {
     fn consume(&mut self) -> Option<char> {
         if let Some(c) = self.peek() {
             self.pos += c.len_utf8();
+            self.col += 1;
             Some(c)
         } else {
             None
@@ -72,7 +73,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn consume_numeric(&mut self) -> Result<Token, LexerError> {
+        // consume first char
         let start_idx = self.pos;
+        let position = self.col;
+        self.consume();
 
         while let Some(n) = self.peek() {
             if n.is_ascii_digit() {
@@ -84,10 +88,10 @@ impl<'a> Lexer<'a> {
 
         let lexeme = &self.stream[start_idx..self.pos];
         match lexeme.parse::<u8>() {
-            Ok(num) => Ok(Token::new(TokenType::Number(num), self.col)),
+            Ok(num) => Ok(Token::new(TokenType::Number(num), position)),
             Err(_) => Err(LexerError::new(format!(
                 "Number '{}' out of bounds at {}. Expected u8 number (0-255).",
-                lexeme, self.col
+                lexeme, position
             ))),
         }
     }
@@ -97,6 +101,10 @@ impl<'a> Lexer<'a> {
         let c = self.peek()?;
         match c {
             c if c.is_ascii_digit() => Some(self.consume_numeric()),
+            '+' => {
+                self.consume();
+                Some(Ok(Token::new(TokenType::Plus, self.col)))
+            }
             _ => Some(Err(LexerError::new(format!(
                 "Unexpected token at {}.",
                 self.col
@@ -111,9 +119,15 @@ mod tests {
 
     #[test]
     fn test_lexer() {
-        let mut lexer = Lexer::new("213");
+        let mut lexer = Lexer::new("213 + 13");
         let t = lexer.next_token().unwrap().unwrap();
 
         assert_eq!(t.kind, TokenType::Number(213));
+
+        let t = lexer.next_token().unwrap().unwrap();
+        assert_eq!(t.kind, TokenType::Plus);
+
+        let t = lexer.next_token().unwrap().unwrap();
+        assert_eq!(t.kind, TokenType::Number(13));
     }
 }

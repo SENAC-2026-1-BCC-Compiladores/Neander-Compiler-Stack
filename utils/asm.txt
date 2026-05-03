@@ -1,7 +1,7 @@
 ; Exemplo minimo de assembly
 
 setup
-	A DATA 44
+	!A DATA 44
 	B DATA 50
 	C SPACE 5
 end

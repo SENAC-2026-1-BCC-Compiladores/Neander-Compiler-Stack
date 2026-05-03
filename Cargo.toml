@@ -11,6 +11,10 @@ path = "src/bin/assembler.rs"
 name = "interpreter"
 path = "src/bin/interpreter.rs"
 
+[[bin]]
+name = "calc"
+path = "src/bin/calc.rs"
+
 [dependencies]
 clap = { version = "4.6.0", features = ["derive"] }
 bnf = "0.6"
