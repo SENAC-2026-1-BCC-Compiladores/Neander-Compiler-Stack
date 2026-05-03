@@ -1,8 +1,9 @@
+use crate::assembler::codegen::SymbolTable;
 use crate::assembler::*;
-use std::collections::HashMap;
+use std::error::Error;
 
 #[derive(Debug, PartialEq)]
-enum DataDecl {
+pub enum DataDecl {
     Data(String, u8),
     Space(String, u8),
     Org(u8),
@@ -325,7 +326,7 @@ impl<'a> ParserT<'a> {
         out_bin
     }
 
-    pub fn parse(&mut self) -> Result<[u8; 516], LexerError> {
+    pub fn parse(&mut self) -> Result<[u8; 516], Box<dyn Error>> {
         let parsed_program = self.parse_program()?;
         self.symbols.build(&parsed_program.setup)?;
         self.program = Some(parsed_program);
@@ -342,68 +343,4 @@ pub fn print_bin(bin: &[u8]) {
         println!();
     }
     println!();
-}
-
-pub type Item = (u8, u8);
-
-#[derive(Debug)]
-pub struct SymbolTable {
-    pub program_counter: u8,
-    pub map: HashMap<String, Item>,
-}
-
-impl SymbolTable {
-    pub fn new() -> Self {
-        Self {
-            program_counter: 0,
-            map: HashMap::new(),
-        }
-    }
-
-    fn build(&mut self, declarations: &[DataDecl]) -> Result<(), LexerError> {
-        let mut current_addr: u8 = 250;
-
-        for decl in declarations {
-            match decl {
-                DataDecl::Data(var, value) => {
-                    if self.map.contains_key(var) {
-                        return Err(LexerError::new(format!(
-                            "Semantic error. Var '{}' was already declared.",
-                            var
-                        )));
-                    }
-
-                    self.map.insert(var.clone(), (current_addr, *value));
-                    current_addr -= 1;
-                }
-                DataDecl::Space(var, size) => {
-                    if self.map.contains_key(var) {
-                        return Err(LexerError::new(format!(
-                            "Semantic error. Var '{}' was already declared.",
-                            var
-                        )));
-                    }
-
-                    current_addr -= size - 1;
-
-                    self.map.insert(var.clone(), (current_addr, 0u8));
-                }
-                DataDecl::Org(addr) => {
-                    if self.program_counter != 0 {
-                        return Err(LexerError::new(
-                            "Semantic error. Program count was already set.".into(),
-                        ));
-                    }
-                    self.program_counter = *addr;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Default for SymbolTable {
-    fn default() -> Self {
-        Self::new()
-    }
 }
