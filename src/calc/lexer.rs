@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Copy, Clone)]
 pub enum TokenType {
     Number(u8),
     Plus,
