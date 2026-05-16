@@ -1,5 +1,6 @@
 use clap::Parser;
 use neander_compiler_stack::calc::lexer::Lexer;
+use neander_compiler_stack::calc::parser::CalcParser;
 use std::error::Error;
 
 #[derive(Parser)]
@@ -13,14 +14,11 @@ fn process_expression(expr: &str) {
 }
 
 pub fn main() -> Result<(), Box<dyn Error>> {
-    let mut l = Lexer::new("14 + 13");
+    let l = Lexer::new("14 + 13 + 2");
 
-    while let Some(t) = l.next_token() {
-        match t {
-            Ok(token) => println!("{:?}", token),
-            Err(_) => return Err("erro".into()),
-        }
-    }
+    let mut parser = CalcParser::new(l)?;
+    let ast = parser.parse_expr()?;
+    ast.print(0);
 
     Ok(())
 }

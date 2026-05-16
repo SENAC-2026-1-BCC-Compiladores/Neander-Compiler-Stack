@@ -22,9 +22,26 @@ impl fmt::Display for ParserError {
 
 impl Error for ParserError {}
 
-enum AST {
+pub enum AST {
     Add(Box<AST>, Box<AST>),
     Number(u8),
+}
+
+impl AST {
+    pub fn print(&self, level: usize) {
+        let ident = "    ".repeat(level);
+
+        match self {
+            AST::Add(right, left) => {
+                right.print(level + 1);
+                std::println!("{}+", ident);
+                left.print(level + 1);
+            }
+            AST::Number(num) => {
+                std::println!("{}{}", ident, num);
+            }
+        }
+    }
 }
 
 pub struct CalcParser<'a> {
@@ -33,27 +50,13 @@ pub struct CalcParser<'a> {
 }
 
 impl<'a> CalcParser<'a> {
-    pub fn new(mut lexer: Lexer<'a>) -> Self {
-        let t = lexer.next_token();
-
-        let first_token = match t {
-            Some(Ok(token)) => token,
-            Some(Err(e)) => {
-                panic!("{}", e);
-            }
-            None => {
-                panic!("Error: there was not a first token.");
-            }
-        };
-
-        CalcParser {
-            lexer,
-            lookahead: Some(first_token),
-        }
+    pub fn new(mut lexer: Lexer<'a>) -> Result<Self, LexerError> {
+        let lookahead = lexer.next_token().transpose()?;
+        Ok(CalcParser { lexer, lookahead })
     }
 
     fn peek_kind(&self) -> Option<TokenType> {
-        Some(self.lookahead.as_ref().unwrap().kind)
+        self.lookahead.as_ref().map(|t| t.kind)
     }
 
     fn advance(&mut self) -> Result<(), LexerError> {
@@ -71,6 +74,19 @@ impl<'a> CalcParser<'a> {
                 Ok(())
             }
         }
+    }
+
+    pub fn parse_expr(&mut self) -> Result<AST, Box<dyn Error>> {
+        let mut left = self.parse_factor()?;
+
+        while let Some(TokenType::Plus) = self.peek_kind() {
+            self.advance()?;
+
+            let right = self.parse_factor()?;
+            left = AST::Add(Box::new(left), Box::new(right));
+        }
+
+        Ok(left)
     }
 
     fn parse_factor(&mut self) -> Result<AST, Box<dyn Error>> {
