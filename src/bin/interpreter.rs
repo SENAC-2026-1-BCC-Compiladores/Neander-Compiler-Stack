@@ -2,7 +2,7 @@ use clap::Parser;
 use neander_compiler_stack::interpreter::Interpreter;
 use std::error::Error;
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 
 #[derive(Parser)]
 struct Cli {
@@ -15,15 +15,13 @@ struct Cli {
 
 pub fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let data: Vec<u8>;
-    let mut buff = String::new();
+    let mut data: Vec<u8> = Vec::<u8>::new();
 
     if let Some(p) = cli.path {
         data = fs::read(p)?;
     } else {
-        io::stdin().read_line(&mut buff)?;
-        let file_name = buff.trim().replace("\"", "");
-        data = fs::read(file_name)?;
+        let mut handle = io::stdin().lock();
+        handle.read_to_end(&mut data)?;
     }
 
     let mut interpreter = Interpreter::new();
