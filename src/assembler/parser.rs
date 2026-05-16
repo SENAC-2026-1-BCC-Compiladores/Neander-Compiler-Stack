@@ -268,7 +268,7 @@ impl<'a> ParserT<'a> {
         Ok(p)
     }
 
-    fn generate_binary(&self) -> Result<[u8; 256], LexerError> {
+    fn generate_binary(&self, program: &Program) -> Result<[u8; 256], LexerError> {
         let mut mem = [0; 256];
         let mut pc = self.symbols.program_counter as usize;
         let program = self.program.as_ref().expect("Progam was not parsed yet.");
@@ -329,8 +329,8 @@ impl<'a> ParserT<'a> {
     pub fn parse(&mut self) -> Result<[u8; 516], Box<dyn Error>> {
         let parsed_program = self.parse_program()?;
         self.symbols.build(&parsed_program.setup)?;
-        self.program = Some(parsed_program);
-        let bin = self.transform_bin(&self.generate_binary()?);
+        let bin = self.generate_binary(&parsed_program)?;
+        let bin = self.transform_bin(&bin);
         Ok(bin)
     }
 }
