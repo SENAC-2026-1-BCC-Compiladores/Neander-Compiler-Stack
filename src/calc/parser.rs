@@ -1,4 +1,26 @@
+use std::error::Error;
+use std::fmt;
+
 use crate::calc::lexer::{Lexer, LexerError, Token, TokenType};
+
+#[derive(Debug)]
+pub struct ParserError {
+    pub error: String,
+}
+
+impl ParserError {
+    pub fn new(message: String) -> Self {
+        ParserError { error: message }
+    }
+}
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Parser Error: {}", self.error)
+    }
+}
+
+impl Error for ParserError {}
 
 enum AST {
     Add(Box<AST>, Box<AST>),
@@ -48,6 +70,22 @@ impl<'a> CalcParser<'a> {
                 self.lookahead = None;
                 Ok(())
             }
+        }
+    }
+
+    fn parse_factor(&mut self) -> Result<AST, Box<dyn Error>> {
+        match self.peek_kind() {
+            Some(TokenType::Number(num)) => {
+                let node = AST::Number(num);
+                self.advance()?;
+                Ok(node)
+            }
+            Some(kind) => Err(ParserError::new(format!(
+                "Unexpected token: {:?}. Was expecting a number",
+                kind
+            ))
+            .into()),
+            None => Err(ParserError::new("Was expecting number".to_string()).into()),
         }
     }
 }
