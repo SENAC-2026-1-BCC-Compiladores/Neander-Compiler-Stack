@@ -83,7 +83,7 @@ impl<'a> ParserT<'a> {
     }
 
     fn peek_kind(&self) -> Option<TokenType<'a>> {
-        Some(self.lookahead.as_ref().unwrap().kind)
+        self.lookahead.as_ref().map(|t| t.kind)
     }
 
     fn current_line(&self) -> usize {
@@ -271,7 +271,6 @@ impl<'a> ParserT<'a> {
     fn generate_binary(&self, program: &Program) -> Result<[u8; 256], LexerError> {
         let mut mem = [0; 256];
         let mut pc = self.symbols.program_counter as usize;
-        let program = self.program.as_ref().expect("Progam was not parsed yet.");
 
         for (addr, value) in self.symbols.map.values() {
             mem[*addr as usize] = *value;
