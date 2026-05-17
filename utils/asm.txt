@@ -3,10 +3,12 @@
 setup
 	A DATA 44
 	B DATA 50
-	C SPACE 5
+	D DATA 0
 end
 
 text
 	add A
+	add B
+	sta D
 	hlt
 end
