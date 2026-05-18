@@ -78,10 +78,10 @@ impl SymbolTable {
         }
 
         self.map.insert("t0".to_string(), (251, 0));
-        self.map.insert("t2".to_string(), (252, 0));
-        self.map.insert("t3".to_string(), (253, 0));
-        self.map.insert("t4".to_string(), (254, 0));
-        self.map.insert("t5".to_string(), (255, 0));
+        self.map.insert("t1".to_string(), (252, 0));
+        self.map.insert("t2".to_string(), (253, 0));
+        self.map.insert("t3".to_string(), (254, 0));
+        self.map.insert("t4".to_string(), (255, 0));
 
         Ok(())
     }
