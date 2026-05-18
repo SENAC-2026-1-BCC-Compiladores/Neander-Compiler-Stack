@@ -38,7 +38,7 @@ impl Codegen {
         }
     }
 
-    pub fn emit_setup(&mut self, tree: &AST) {
+    fn emit_setup(&mut self, tree: &AST) {
         self.code.push_str("setup\n");
         self.generate_symbols(tree);
 
@@ -48,6 +48,37 @@ impl Codegen {
         }
 
         self.code.push_str("end\n");
+    }
+
+    fn generate_instructions(&mut self, tree: &AST) -> String {
+        match tree {
+            AST::Number(num) => {
+                format!("CONST{}", *num)
+            }
+            AST::Add(left, right) => {
+                let left_result = self.generate_instructions(left);
+                let right_result = self.generate_instructions(right);
+                let res = "t4".to_string();
+
+                self.code.push_str(&format!("\tlda {}\n", left_result));
+                self.code.push_str(&format!("\tadd {}\n", right_result));
+                self.code.push_str(&format!("\tsta {}\n", res));
+
+                res
+            }
+        }
+    }
+
+    fn emit_text(&mut self, tree: &AST) {
+        self.code.push_str("text\n");
+        self.generate_instructions(tree);
+        self.code.push_str("\thlt\n");
+        self.code.push_str("end\n");
+    }
+
+    pub fn generate_code(&mut self, tree: &AST) {
+        self.emit_setup(tree);
+        self.emit_text(tree);
     }
 }
 

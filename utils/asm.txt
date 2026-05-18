@@ -1,14 +1,14 @@
-; Exemplo minimo de assembly
-
 setup
-	A DATA 44
-	B DATA 50
-	D DATA 0
+	CONST2 DATA 2
+	CONST14 DATA 14
+	CONST13 DATA 13
 end
-
 text
-	add A
-	add B
-	sta D
+	lda CONST14
+	add CONST13
+	sta t4
+	lda t4
+	add CONST2
+	sta t4
 	hlt
 end
