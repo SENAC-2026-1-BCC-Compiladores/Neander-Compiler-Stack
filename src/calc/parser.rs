@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::calc::lexer::{Lexer, LexerError, Token, TokenType};
+use crate::calc::lexer::{LexerCalc, LexerError, Token, TokenType};
 
 #[derive(Debug)]
 pub struct ParserError {
@@ -51,12 +51,12 @@ impl AST {
 }
 
 pub struct CalcParser<'a> {
-    lexer: Lexer<'a>,
+    lexer: LexerCalc<'a>,
     lookahead: Option<Token>,
 }
 
 impl<'a> CalcParser<'a> {
-    pub fn new(mut lexer: Lexer<'a>) -> Result<Self, LexerError> {
+    pub fn new(mut lexer: LexerCalc<'a>) -> Result<Self, LexerError> {
         let lookahead = lexer.next_token().transpose()?;
         Ok(CalcParser { lexer, lookahead })
     }

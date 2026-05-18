@@ -6,14 +6,14 @@ pub struct Symbol {
     pub value: u8,
 }
 
-pub struct Codegen {
+pub struct CodegenCalc {
     pub code: String,
     pub symbols: HashMap<u8, Symbol>,
 }
 
-impl Codegen {
+impl CodegenCalc {
     pub fn new() -> Self {
-        Codegen {
+        CodegenCalc {
             code: String::new(),
             symbols: HashMap::new(),
         }
@@ -97,7 +97,7 @@ impl Codegen {
     }
 }
 
-impl Default for Codegen {
+impl Default for CodegenCalc {
     fn default() -> Self {
         Self::new()
     }

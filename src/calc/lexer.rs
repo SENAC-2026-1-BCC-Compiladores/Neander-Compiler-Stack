@@ -38,15 +38,28 @@ impl fmt::Display for LexerError {
 
 impl std::error::Error for LexerError {}
 
-pub struct Lexer<'a> {
+pub struct LexerCalc<'a> {
     pub stream: &'a str,
     pub pos: usize,
     pub col: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(stream: &'a str) -> Self {
-        Lexer {
+impl<'a> LexerCalc<'a> {
+    pub fn new() -> Self {
+        LexerCalc {
+            stream: "",
+            pos: 0,
+            col: 1,
+        }
+    }
+
+    pub fn start_stream(mut self, stream: &'a str) -> Self {
+        self.stream = stream;
+        self
+    }
+
+    pub fn new_with_stream(stream: &'a str) -> Self {
+        LexerCalc {
             stream,
             pos: 0,
             col: 1,
@@ -118,13 +131,19 @@ impl<'a> Lexer<'a> {
     }
 }
 
+impl<'a> Default for LexerCalc<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_lexer() {
-        let mut lexer = Lexer::new("213 + 13");
+        let mut lexer = LexerCalc::new().start_stream("213 + 2");
         let t = lexer.next_token().unwrap().unwrap();
 
         assert_eq!(t.kind, TokenType::Number(213));
