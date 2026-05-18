@@ -10,18 +10,45 @@ pub enum DataDecl {
 }
 
 #[derive(Debug, PartialEq)]
+enum Register {
+    T0,
+    T1,
+    T2,
+    T3,
+    T4,
+}
+
+impl Register {
+    fn address(&self) -> u8 {
+        match self {
+            Register::T0 => 251,
+            Register::T1 => 252,
+            Register::T2 => 253,
+            Register::T3 => 254,
+            Register::T4 => 255,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum Operand {
+    Register(Register),
+    Symbol(String),
+}
+
+#[derive(Debug, PartialEq)]
 enum Instruction {
-    Add(String),
-    Lda(String),
-    Sta(String),
+    Add(Operand),
+    Lda(Operand),
+    Sta(Operand),
     Hlt,
     Nop,
-    Jmp(String),
-    Jz(String),
-    Jn(String),
-    Not(String),
-    Or(String),
-    And(String),
+    Jmp(Operand),
+    Jz(Operand),
+    Jn(Operand),
+    Not(Operand),
+    Or(Operand),
+    And(Operand),
 }
 
 pub struct Program {
@@ -113,6 +140,38 @@ impl<'a> ParserT<'a> {
             self.advance()?;
         }
         Ok(())
+    }
+
+    fn expect_operand(&mut self) -> Result<Operand, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Register(name)) => {
+                let op = match name {
+                    "t0" => Operand::Register(Register::T0),
+                    "t1" => Operand::Register(Register::T1),
+                    "t2" => Operand::Register(Register::T2),
+                    "t3" => Operand::Register(Register::T3),
+                    "t4" => Operand::Register(Register::T4),
+                    _ => return Err(LexerError::new(format!("Unkown register '{}'", name))),
+                };
+
+                self.advance()?;
+                Ok(op)
+            }
+
+            Some(TokenType::Identfier(name)) => {
+                let op = Operand::Symbol(name.to_string());
+                self.advance()?;
+                Ok(op)
+            }
+
+            Some(wrong_kind) => Err(LexerError::new(format!(
+                "Expected Operand at line {} but found '{}'",
+                self.current_line(),
+                wrong_kind
+            ))),
+
+            None => Err(LexerError::new("Unexpected EOF".to_string())),
+        }
     }
 
     fn expect_identifier(&mut self) -> Result<&'a str, LexerError> {
@@ -225,6 +284,21 @@ impl<'a> ParserT<'a> {
         self.parse_section("setup", |parser| parser.parse_data_stmt())
     }
 
+    fn resolve_operand(&self, operand: &Operand) -> Result<u8, LexerError> {
+        match operand {
+            Operand::Register(reg) => Ok(reg.address()),
+
+            Operand::Symbol(name) => match self.symbols.map.get(name) {
+                Some(&(addr, _)) => Ok(addr),
+
+                None => Err(LexerError::new(format!(
+                    "Semantic error. Var '{}' was not found.",
+                    name
+                ))),
+            },
+        }
+    }
+
     fn parse_instruction(&mut self) -> Result<Instruction, LexerError> {
         let instr = self.expect_instruction()?;
 
@@ -232,17 +306,17 @@ impl<'a> ParserT<'a> {
             "hlt" => Ok(Instruction::Hlt),
             "nop" => Ok(Instruction::Nop),
             _ => {
-                let id = self.expect_identifier()?;
+                let op = self.expect_operand()?;
                 match instr {
-                    "add" => Ok(Instruction::Add(id.to_string())),
-                    "lda" => Ok(Instruction::Lda(id.to_string())),
-                    "sta" => Ok(Instruction::Sta(id.to_string())),
-                    "jmp" => Ok(Instruction::Jmp(id.to_string())),
-                    "jn" => Ok(Instruction::Jn(id.to_string())),
-                    "jz" => Ok(Instruction::Jz(id.to_string())),
-                    "or" => Ok(Instruction::Or(id.to_string())),
-                    "not" => Ok(Instruction::Not(id.to_string())),
-                    "and" => Ok(Instruction::And(id.to_string())),
+                    "add" => Ok(Instruction::Add(op)),
+                    "lda" => Ok(Instruction::Lda(op)),
+                    "sta" => Ok(Instruction::Sta(op)),
+                    "jmp" => Ok(Instruction::Jmp(op)),
+                    "jn" => Ok(Instruction::Jn(op)),
+                    "jz" => Ok(Instruction::Jz(op)),
+                    "or" => Ok(Instruction::Or(op)),
+                    "not" => Ok(Instruction::Not(op)),
+                    "and" => Ok(Instruction::And(op)),
                     _ => Err(LexerError::new(format!(
                         "Expected 'instruction' at line {}, but found token '{}'",
                         self.current_line(),
@@ -294,19 +368,11 @@ impl<'a> ParserT<'a> {
             mem[pc] = opcode;
             pc += 1;
 
-            if let Some(var_name) = opt_var {
-                match self.symbols.map.get(var_name) {
-                    Some(&item) => {
-                        mem[pc] = item.0;
-                        pc += 1;
-                    }
-                    None => {
-                        return Err(LexerError::new(format!(
-                            "Semantic error. Var '{}' was not found.",
-                            var_name
-                        )));
-                    }
-                }
+            if let Some(operand) = opt_var {
+                // let ret = self.resolve_operand(operand)?;
+                // println!("ret {:?}\n", ret);
+                mem[pc] = self.resolve_operand(operand)?;
+                pc += 1;
             }
         }
 
