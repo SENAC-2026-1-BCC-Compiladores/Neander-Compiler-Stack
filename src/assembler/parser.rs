@@ -8,7 +8,7 @@ pub enum DataDecl {
     Org(u8),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Register {
     T0,
     T1,
@@ -29,15 +29,16 @@ impl Register {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operand {
     Register(Register),
     Symbol(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Instruction {
     Add(Operand),
+    Sub(Operand),
     Lda(Operand),
     Sta(Operand),
     Hlt,
@@ -45,7 +46,7 @@ pub enum Instruction {
     Jmp(Operand),
     Jz(Operand),
     Jn(Operand),
-    Not(Operand),
+    Not,
     Or(Operand),
     And(Operand),
 }
@@ -289,17 +290,18 @@ impl<'a> ParserT<'a> {
         match instr {
             "hlt" => Ok(Instruction::Hlt),
             "nop" => Ok(Instruction::Nop),
+            "not" => Ok(Instruction::Not),
             _ => {
                 let op = self.expect_operand()?;
                 match instr {
                     "add" => Ok(Instruction::Add(op)),
+                    "sub" => Ok(Instruction::Sub(op)),
                     "lda" => Ok(Instruction::Lda(op)),
                     "sta" => Ok(Instruction::Sta(op)),
                     "jmp" => Ok(Instruction::Jmp(op)),
                     "jn" => Ok(Instruction::Jn(op)),
                     "jz" => Ok(Instruction::Jz(op)),
                     "or" => Ok(Instruction::Or(op)),
-                    "not" => Ok(Instruction::Not(op)),
                     "and" => Ok(Instruction::And(op)),
                     _ => Err(LexerError::new(format!(
                         "Expected 'instruction' at line {}, but found token '{}'",

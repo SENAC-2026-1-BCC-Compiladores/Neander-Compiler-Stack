@@ -108,9 +108,8 @@ impl<'a> Lexer<'a> {
             "t0" | "t1" | "t2" | "t3" | "t4" => TokenType::Register(lexeme),
             "setup" | "text" | "end" => TokenType::Label(lexeme),
             "DATA" | "SPACE" | "ORG" => TokenType::DataDeclaration(lexeme),
-            "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt" => {
-                TokenType::Instruction(lexeme)
-            }
+            "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt"
+            | "sub" => TokenType::Instruction(lexeme),
             _ => TokenType::Identfier(lexeme),
         }
     }

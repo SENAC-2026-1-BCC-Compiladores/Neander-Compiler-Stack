@@ -1,5 +1,5 @@
 use crate::assembler::LexerError;
-use crate::assembler::parser::{DataDecl, Instruction, Operand, Program};
+use crate::assembler::parser::{DataDecl, Instruction, Operand, Program, Register};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -83,7 +83,7 @@ impl Codegen {
         self.map.insert("t0".to_string(), (251, 0));
         self.map.insert("t1".to_string(), (252, 0));
         self.map.insert("t2".to_string(), (253, 0));
-        self.map.insert("t3".to_string(), (254, 0));
+        self.map.insert("t3".to_string(), (254, 1));
         self.map.insert("t4".to_string(), (255, 0));
 
         Ok(())
@@ -104,33 +104,90 @@ impl Codegen {
         }
     }
 
+    fn emit_opcode(&mut self, opcode: u8) {
+        self.bin[self.pc as usize] = opcode;
+        self.pc += 1;
+    }
+
+    fn emit_operand(&mut self, operand: &Operand) -> Result<(), LexerError> {
+        let addr = self.resolve_operand(operand)?;
+        self.bin[self.pc as usize] = addr;
+        self.pc += 1;
+        Ok(())
+    }
+
+    fn emit_unary(&mut self, opcode: u8, operand: &Operand) -> Result<(), LexerError> {
+        self.emit_opcode(opcode);
+        self.emit_operand(operand)?;
+        Ok(())
+    }
+
+    fn expand_sub(&mut self, operand: &Operand) -> Result<(), LexerError> {
+        let t0 = Operand::Register(Register::T0);
+        let t1 = Operand::Register(Register::T1);
+        let t3 = Operand::Register(Register::T3);
+
+        self.emit_unary(16, &t0)?;
+        self.emit_unary(32, operand)?;
+        self.emit_opcode(96);
+        self.emit_unary(48, &t3)?;
+        self.emit_unary(16, &t1)?;
+        self.emit_unary(32, &t0)?;
+        self.emit_unary(48, &t1)?;
+
+        Ok(())
+    }
+
+    fn emit_instruction(&mut self, instr: &Instruction) -> Result<(), LexerError> {
+        match instr {
+            Instruction::Nop => {
+                self.emit_opcode(0);
+            }
+            Instruction::Hlt => {
+                self.emit_opcode(240);
+            }
+            Instruction::Not => {
+                self.emit_opcode(96);
+            }
+            Instruction::Add(op) => {
+                self.emit_unary(48, op)?;
+            }
+            Instruction::Sta(op) => {
+                self.emit_unary(16, op)?;
+            }
+            Instruction::Lda(op) => {
+                self.emit_unary(32, op)?;
+            }
+            Instruction::Or(op) => {
+                self.emit_unary(64, op)?;
+            }
+            Instruction::And(op) => {
+                self.emit_unary(80, op)?;
+            }
+            Instruction::Jmp(op) => {
+                self.emit_unary(128, op)?;
+            }
+            Instruction::Jn(op) => {
+                self.emit_unary(144, op)?;
+            }
+            Instruction::Jz(op) => {
+                self.emit_unary(160, op)?;
+            }
+            Instruction::Sub(op) => {
+                self.expand_sub(op)?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn generate_binary(&mut self, program: &Program) -> Result<(), LexerError> {
         for (addr, value) in self.map.values() {
             self.bin[*addr as usize] = *value;
         }
 
         for instruction in &program.text {
-            let (opcode, opt_var) = match instruction {
-                Instruction::Nop => (0u8, None),
-                Instruction::Hlt => (240u8, None),
-                Instruction::Add(v) => (48u8, Some(v)),
-                Instruction::Sta(v) => (16u8, Some(v)),
-                Instruction::Lda(v) => (32u8, Some(v)),
-                Instruction::Or(v) => (64u8, Some(v)),
-                Instruction::And(v) => (80u8, Some(v)),
-                Instruction::Not(v) => (96u8, Some(v)),
-                Instruction::Jmp(v) => (128u8, Some(v)),
-                Instruction::Jn(v) => (144u8, Some(v)),
-                Instruction::Jz(v) => (160u8, Some(v)),
-            };
-
-            self.bin[self.pc as usize] = opcode;
-            self.pc += 1;
-
-            if let Some(operand) = opt_var {
-                self.bin[self.pc as usize] = self.resolve_operand(operand)?;
-                self.pc += 1;
-            }
+            self.emit_instruction(instruction)?;
         }
 
         Ok(())
