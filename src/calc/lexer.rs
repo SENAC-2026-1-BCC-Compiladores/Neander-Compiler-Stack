@@ -4,6 +4,7 @@ use std::fmt;
 pub enum TokenType {
     Number(u8),
     Plus,
+    Minus,
 }
 
 #[derive(PartialEq, Debug)]
@@ -105,8 +106,12 @@ impl<'a> Lexer<'a> {
                 self.consume();
                 Some(Ok(Token::new(TokenType::Plus, self.col)))
             }
+            '-' => {
+                self.consume();
+                Some(Ok(Token::new(TokenType::Minus, self.col)))
+            }
             _ => Some(Err(LexerError::new(format!(
-                "Unexpected token at {}.",
+                "Unexpected token at column {}.",
                 self.col
             )))),
         }

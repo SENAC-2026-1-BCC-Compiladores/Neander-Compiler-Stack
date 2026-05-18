@@ -35,6 +35,10 @@ impl Codegen {
                 self.generate_symbols(left);
                 self.generate_symbols(right);
             }
+            AST::Sub(left, right) => {
+                self.generate_symbols(left);
+                self.generate_symbols(right);
+            }
         }
     }
 
@@ -62,6 +66,17 @@ impl Codegen {
 
                 self.code.push_str(&format!("\tlda {}\n", left_result));
                 self.code.push_str(&format!("\tadd {}\n", right_result));
+                self.code.push_str(&format!("\tsta {}\n", res));
+
+                res
+            }
+            AST::Sub(left, right) => {
+                let left_result = self.generate_instructions(left);
+                let right_result = self.generate_instructions(right);
+                let res = "t4".to_string();
+
+                self.code.push_str(&format!("\tlda {}\n", left_result));
+                self.code.push_str(&format!("\tsub {}\n", right_result));
                 self.code.push_str(&format!("\tsta {}\n", res));
 
                 res

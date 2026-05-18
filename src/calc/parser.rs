@@ -23,8 +23,9 @@ impl fmt::Display for ParserError {
 impl Error for ParserError {}
 
 pub enum AST {
-    Add(Box<AST>, Box<AST>),
     Number(u8),
+    Add(Box<AST>, Box<AST>),
+    Sub(Box<AST>, Box<AST>),
 }
 
 impl AST {
@@ -32,10 +33,15 @@ impl AST {
         let ident = "    ".repeat(level);
 
         match self {
-            AST::Add(right, left) => {
-                right.print(level + 1);
-                std::println!("{}+", ident);
+            AST::Add(left, right) => {
                 left.print(level + 1);
+                std::println!("{}+", ident);
+                right.print(level + 1);
+            }
+            AST::Sub(left, right) => {
+                left.print(level + 1);
+                std::println!("{}-", ident);
+                right.print(level + 1);
             }
             AST::Number(num) => {
                 std::println!("{}{}", ident, num);
@@ -79,11 +85,19 @@ impl<'a> CalcParser<'a> {
     pub fn parse_expr(&mut self) -> Result<AST, Box<dyn Error>> {
         let mut left = self.parse_factor()?;
 
-        while let Some(TokenType::Plus) = self.peek_kind() {
-            self.advance()?;
+        while let Some(kind) = self.peek_kind() {
+            if kind == TokenType::Plus || kind == TokenType::Minus {
+                self.advance()?;
+                let right = self.parse_factor()?;
 
-            let right = self.parse_factor()?;
-            left = AST::Add(Box::new(left), Box::new(right));
+                if kind == TokenType::Plus {
+                    left = AST::Add(Box::new(left), Box::new(right));
+                } else {
+                    left = AST::Sub(Box::new(left), Box::new(right));
+                }
+            } else {
+                break;
+            }
         }
 
         Ok(left)
