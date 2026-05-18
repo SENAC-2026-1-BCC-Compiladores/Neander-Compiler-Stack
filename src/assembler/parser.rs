@@ -1,6 +1,5 @@
-use crate::assembler::codegen::SymbolTable;
+use crate::assembler::codegen::Codegen;
 use crate::assembler::*;
-use std::error::Error;
 
 #[derive(Debug, PartialEq)]
 pub enum DataDecl {
@@ -10,7 +9,7 @@ pub enum DataDecl {
 }
 
 #[derive(Debug, PartialEq)]
-enum Register {
+pub enum Register {
     T0,
     T1,
     T2,
@@ -19,7 +18,7 @@ enum Register {
 }
 
 impl Register {
-    fn address(&self) -> u8 {
+    pub fn address(&self) -> u8 {
         match self {
             Register::T0 => 251,
             Register::T1 => 252,
@@ -31,13 +30,13 @@ impl Register {
 }
 
 #[derive(Debug, PartialEq)]
-enum Operand {
+pub enum Operand {
     Register(Register),
     Symbol(String),
 }
 
 #[derive(Debug, PartialEq)]
-enum Instruction {
+pub enum Instruction {
     Add(Operand),
     Lda(Operand),
     Sta(Operand),
@@ -52,15 +51,15 @@ enum Instruction {
 }
 
 pub struct Program {
-    setup: Vec<DataDecl>,
-    text: Vec<Instruction>,
+    pub setup: Vec<DataDecl>,
+    pub text: Vec<Instruction>,
 }
 
 pub struct ParserT<'a> {
     pub lexer: Lexer<'a>,
     pub lookahead: Option<Token<'a>>,
     pub valid: bool,
-    pub symbols: SymbolTable,
+    pub symbols: Codegen,
     pub program: Option<Program>,
 }
 
@@ -104,7 +103,7 @@ impl<'a> ParserT<'a> {
             lexer,
             lookahead: first_token,
             valid: is_valid,
-            symbols: SymbolTable::new(),
+            symbols: Codegen::new(),
             program: None,
         }
     }
@@ -284,21 +283,6 @@ impl<'a> ParserT<'a> {
         self.parse_section("setup", |parser| parser.parse_data_stmt())
     }
 
-    fn resolve_operand(&self, operand: &Operand) -> Result<u8, LexerError> {
-        match operand {
-            Operand::Register(reg) => Ok(reg.address()),
-
-            Operand::Symbol(name) => match self.symbols.map.get(name) {
-                Some(&(addr, _)) => Ok(addr),
-
-                None => Err(LexerError::new(format!(
-                    "Semantic error. Var '{}' was not found.",
-                    name
-                ))),
-            },
-        }
-    }
-
     fn parse_instruction(&mut self) -> Result<Instruction, LexerError> {
         let instr = self.expect_instruction()?;
 
@@ -331,7 +315,7 @@ impl<'a> ParserT<'a> {
         self.parse_section("text", |parser| parser.parse_instruction())
     }
 
-    fn parse_program(&mut self) -> Result<Program, LexerError> {
+    pub fn parse(&mut self) -> Result<Program, LexerError> {
         self.consume_blanks()?;
         let data = self.parse_data()?;
 
@@ -341,71 +325,4 @@ impl<'a> ParserT<'a> {
         let p = Program { setup: data, text };
         Ok(p)
     }
-
-    fn generate_binary(&self, program: &Program) -> Result<[u8; 256], LexerError> {
-        let mut mem = [0; 256];
-        let mut pc = self.symbols.program_counter as usize;
-
-        for (addr, value) in self.symbols.map.values() {
-            mem[*addr as usize] = *value;
-        }
-
-        for instruction in &program.text {
-            let (opcode, opt_var) = match instruction {
-                Instruction::Nop => (0u8, None),
-                Instruction::Hlt => (240u8, None),
-                Instruction::Add(v) => (48u8, Some(v)),
-                Instruction::Sta(v) => (16u8, Some(v)),
-                Instruction::Lda(v) => (32u8, Some(v)),
-                Instruction::Or(v) => (64u8, Some(v)),
-                Instruction::And(v) => (80u8, Some(v)),
-                Instruction::Not(v) => (96u8, Some(v)),
-                Instruction::Jmp(v) => (128u8, Some(v)),
-                Instruction::Jn(v) => (144u8, Some(v)),
-                Instruction::Jz(v) => (160u8, Some(v)),
-            };
-
-            mem[pc] = opcode;
-            pc += 1;
-
-            if let Some(operand) = opt_var {
-                // let ret = self.resolve_operand(operand)?;
-                // println!("ret {:?}\n", ret);
-                mem[pc] = self.resolve_operand(operand)?;
-                pc += 1;
-            }
-        }
-
-        Ok(mem)
-    }
-
-    fn transform_bin(&self, bin: &[u8]) -> [u8; 516] {
-        let mut out_bin: [u8; 516] = [0; 516];
-
-        out_bin[0..4].copy_from_slice(&[3, 78, 68, 82]);
-
-        for i in 0..256 {
-            out_bin[i * 2 + 4] = bin[i];
-        }
-
-        out_bin
-    }
-
-    pub fn parse(&mut self) -> Result<[u8; 516], Box<dyn Error>> {
-        let parsed_program = self.parse_program()?;
-        self.symbols.build(&parsed_program.setup)?;
-        let bin = self.generate_binary(&parsed_program)?;
-        let bin = self.transform_bin(&bin);
-        Ok(bin)
-    }
-}
-
-pub fn print_bin(bin: &[u8]) {
-    for chunk in bin.chunks(16) {
-        for byte in chunk {
-            print!(" {:02}", byte);
-        }
-        println!();
-    }
-    println!();
 }

@@ -1,4 +1,5 @@
 use clap::Parser;
+use neander_compiler_stack::assembler::Codegen;
 use neander_compiler_stack::assembler::{Lexer, ParserT};
 use std::error::Error;
 use std::fs;
@@ -33,9 +34,10 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         data = buff;
     }
 
-    let lexer = Lexer::new(&data);
-    let mut parser = ParserT::new(lexer);
-    let bin = parser.parse()?;
+    let mut parser = ParserT::new(Lexer::new(&data));
+    let mut codegen = Codegen::new();
+    let program = parser.parse()?;
+    let bin = codegen.generate(&program)?;
 
     if let Some(path) = cli.output {
         let mut p = PathBuf::from(path);
