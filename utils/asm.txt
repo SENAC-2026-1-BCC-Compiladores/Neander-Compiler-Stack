@@ -1,14 +1,9 @@
 setup
-	CONST2 DATA 2
-	CONST14 DATA 14
-	CONST13 DATA 13
+	CONST15 DATA 15
+	CONST5 DATA 5
 end
 text
-	lda CONST14
-	add CONST13
-	sta t4
-	lda t4
-	add CONST2
-	sta t4
+	lda CONST15
+	sub CONST5
 	hlt
 end

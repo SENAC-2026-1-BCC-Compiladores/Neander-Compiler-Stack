@@ -119,7 +119,7 @@ impl Interpreter {
             let opcode = self.fetch();
 
             if let Some(function) = Interpreter::get_rules(opcode) {
-                if opcode == 0 || opcode == 240 {
+                if opcode == 0 || opcode == 96 || opcode == 240 {
                     function(self, 0);
                     continue;
                 }
