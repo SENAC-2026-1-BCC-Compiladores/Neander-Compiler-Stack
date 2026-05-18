@@ -16,12 +16,10 @@ fn nop(_i: &mut Interpreter, _addr: usize) {
 }
 
 fn sta(i: &mut Interpreter, addr: usize) {
-    println!("função sta chamada");
     i.mem[addr] = i.acc;
 }
 
 fn lda(i: &mut Interpreter, addr: usize) {
-    println!("função lda chamada para o endereço: {}", addr);
     i.acc = i.mem[addr];
 }
 
