@@ -29,6 +29,9 @@ pub enum AST {
 }
 
 impl AST {
+    /// Imprime a árvore AST de forma deitada.
+    ///
+    /// Deve ser chamado como print(0) para imprimir com a indentação correta.
     pub fn print(&self, level: usize) {
         let ident = "    ".repeat(level);
 

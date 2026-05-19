@@ -81,7 +81,7 @@ impl<'a> LexerCalc<'a> {
     }
 
     fn skip_blank(&mut self) {
-        while let Some(' ' | '\t') = self.peek() {
+        while let Some(' ' | '\t' | '\n') = self.peek() {
             self.consume();
         }
     }
