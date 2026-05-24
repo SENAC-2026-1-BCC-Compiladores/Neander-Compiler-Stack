@@ -9,7 +9,7 @@ pub enum DataDecl {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Register {
+pub enum Reserved {
     T0,
     T1,
     T2,
@@ -17,21 +17,21 @@ pub enum Register {
     T4,
 }
 
-impl Register {
+impl Reserved {
     pub fn address(&self) -> u8 {
         match self {
-            Register::T0 => 251,
-            Register::T1 => 252,
-            Register::T2 => 253,
-            Register::T3 => 254,
-            Register::T4 => 255,
+            Reserved::T0 => 251,
+            Reserved::T1 => 252,
+            Reserved::T2 => 253,
+            Reserved::T3 => 254,
+            Reserved::T4 => 255,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operand {
-    Register(Register),
+    Reserved(Reserved),
     Symbol(String),
 }
 
@@ -144,14 +144,19 @@ impl<'a> ParserT<'a> {
 
     fn expect_operand(&mut self) -> Result<Operand, LexerError> {
         match self.peek_kind() {
-            Some(TokenType::Register(name)) => {
+            Some(TokenType::Reserved(name)) => {
                 let op = match name {
-                    "t0" => Operand::Register(Register::T0),
-                    "t1" => Operand::Register(Register::T1),
-                    "t2" => Operand::Register(Register::T2),
-                    "t3" => Operand::Register(Register::T3),
-                    "t4" => Operand::Register(Register::T4),
-                    _ => return Err(LexerError::new(format!("Unkown register '{}'", name))),
+                    "t0" => Operand::Reserved(Reserved::T0),
+                    "t1" => Operand::Reserved(Reserved::T1),
+                    "t2" => Operand::Reserved(Reserved::T2),
+                    "t3" => Operand::Reserved(Reserved::T3),
+                    "t4" => Operand::Reserved(Reserved::T4),
+                    _ => {
+                        return Err(LexerError::new(format!(
+                            "Unkown reserved memory space '{}'",
+                            name
+                        )));
+                    }
                 };
 
                 self.advance()?;

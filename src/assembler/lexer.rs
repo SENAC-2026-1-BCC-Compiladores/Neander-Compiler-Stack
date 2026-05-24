@@ -9,8 +9,8 @@ pub enum TokenType<'a> {
     // Variaveis
     Identfier(&'a str),
 
-    // Registradores
-    Register(&'a str),
+    // Espaços de memória reservados
+    Reserved(&'a str),
 
     // Instrucoes
     Instruction(&'a str),
@@ -32,7 +32,7 @@ impl<'a> fmt::Display for TokenType<'a> {
             TokenType::Semicolon => "Semicolon",
             TokenType::DataDeclaration(_) => "Data Declaration",
             TokenType::Instruction(_) => "Instruction",
-            TokenType::Register(_) => "Register",
+            TokenType::Reserved(_) => "Reserved",
             TokenType::Num(_) => "Number",
             TokenType::NewLine => "New Line",
         };
@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
 
     fn get_reserved_token(lexeme: &'a str) -> TokenType<'a> {
         match lexeme {
-            "t0" | "t1" | "t2" | "t3" | "t4" => TokenType::Register(lexeme),
+            "t0" | "t1" | "t2" | "t3" | "t4" => TokenType::Reserved(lexeme),
             "setup" | "text" | "end" => TokenType::Label(lexeme),
             "DATA" | "SPACE" | "ORG" => TokenType::DataDeclaration(lexeme),
             "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt"

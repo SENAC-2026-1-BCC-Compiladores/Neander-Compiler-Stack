@@ -1,5 +1,5 @@
 use crate::assembler::LexerError;
-use crate::assembler::parser::{DataDecl, Instruction, Operand, Program, Register};
+use crate::assembler::parser::{DataDecl, Instruction, Operand, Program, Reserved};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -41,8 +41,19 @@ impl Codegen {
         }
     }
 
+    fn reserve_memory(&mut self) -> u8 {
+        self.map.insert("ONE".to_string(), (250, 1));
+        self.map.insert("t0".to_string(), (251, 0));
+        self.map.insert("t1".to_string(), (252, 0));
+        self.map.insert("t2".to_string(), (253, 0));
+        self.map.insert("t3".to_string(), (254, 0));
+        self.map.insert("t4".to_string(), (255, 0));
+
+        249
+    }
+
     fn generate_symbols(&mut self, declarations: &[DataDecl]) -> Result<(), SyntaxError> {
-        let mut current_addr: u8 = 250;
+        let mut current_addr: u8 = self.reserve_memory();
 
         for decl in declarations {
             match decl {
@@ -80,18 +91,12 @@ impl Codegen {
             }
         }
 
-        self.map.insert("t0".to_string(), (251, 0));
-        self.map.insert("t1".to_string(), (252, 0));
-        self.map.insert("t2".to_string(), (253, 0));
-        self.map.insert("t3".to_string(), (254, 1));
-        self.map.insert("t4".to_string(), (255, 0));
-
         Ok(())
     }
 
     fn resolve_operand(&self, operand: &Operand) -> Result<u8, LexerError> {
         match operand {
-            Operand::Register(reg) => Ok(reg.address()),
+            Operand::Reserved(reg) => Ok(reg.address()),
 
             Operand::Symbol(name) => match self.map.get(name) {
                 Some(&(addr, _)) => Ok(addr),
@@ -123,9 +128,9 @@ impl Codegen {
     }
 
     fn expand_sub(&mut self, operand: &Operand) -> Result<(), LexerError> {
-        let t0 = Operand::Register(Register::T0);
-        let t1 = Operand::Register(Register::T1);
-        let t3 = Operand::Register(Register::T3);
+        let t0 = Operand::Reserved(Reserved::T0);
+        let t1 = Operand::Reserved(Reserved::T1);
+        let t3 = Operand::Reserved(Reserved::T3);
 
         self.emit_unary(16, &t0)?;
         self.emit_unary(32, operand)?;
