@@ -114,6 +114,11 @@ impl Interpreter {
         code
     }
 
+    fn update_flags(&mut self) {
+        self.zero_f = self.acc == 0;
+        self.negative_f = self.acc > 128;
+    }
+
     pub fn run(&mut self) {
         while (self.pc as usize) < self.mem.len() && !self.should_stop {
             let opcode = self.fetch();
@@ -121,11 +126,13 @@ impl Interpreter {
             if let Some(function) = Interpreter::get_rules(opcode) {
                 if opcode == 0 || opcode == 96 || opcode == 240 {
                     function(self, 0);
+                    self.update_flags();
                     continue;
                 }
 
                 let addr = self.fetch() as usize;
                 function(self, addr);
+                self.update_flags();
             } else {
                 continue;
             }
