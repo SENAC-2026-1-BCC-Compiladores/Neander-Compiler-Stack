@@ -97,7 +97,7 @@ impl<'a> CalcParser<'a> {
         while let Some(kind) = self.peek_kind() {
             if kind == TokenType::Plus || kind == TokenType::Minus {
                 self.advance()?;
-                let right = self.parse_factor()?;
+                let right = self.parse_term()?;
 
                 if kind == TokenType::Plus {
                     left = AST::Add(Box::new(left), Box::new(right));
@@ -131,6 +131,17 @@ impl<'a> CalcParser<'a> {
                 let node = AST::Number(num);
                 self.advance()?;
                 Ok(node)
+            }
+            Some(TokenType::LParen) => {
+                self.advance()?;
+                let node = self.parse_expr()?;
+
+                if let Some(TokenType::RParen) = self.peek_kind() {
+                    self.advance()?;
+                    Ok(node)
+                } else {
+                    Err("Was expecting right parentheses to close expression".into())
+                }
             }
             Some(kind) => Err(ParserError::new(format!(
                 "Unexpected token: {:?}. Was expecting a number",

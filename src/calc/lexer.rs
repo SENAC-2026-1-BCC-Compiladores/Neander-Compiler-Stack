@@ -6,6 +6,8 @@ pub enum TokenType {
     Plus,
     Minus,
     Times,
+    LParen,
+    RParen,
 }
 
 #[derive(PartialEq, Debug)]
@@ -127,6 +129,14 @@ impl<'a> LexerCalc<'a> {
             '*' => {
                 self.consume();
                 Some(Ok(Token::new(TokenType::Times, self.col)))
+            }
+            '(' => {
+                self.consume();
+                Some(Ok(Token::new(TokenType::LParen, self.col)))
+            }
+            ')' => {
+                self.consume();
+                Some(Ok(Token::new(TokenType::RParen, self.col)))
             }
             _ => Some(Err(LexerError::new(format!(
                 "Unexpected token at column {}.",
