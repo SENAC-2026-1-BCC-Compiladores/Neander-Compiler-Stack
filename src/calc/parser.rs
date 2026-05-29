@@ -26,6 +26,7 @@ pub enum AST {
     Number(u8),
     Add(Box<AST>, Box<AST>),
     Sub(Box<AST>, Box<AST>),
+    Times(Box<AST>, Box<AST>),
 }
 
 impl AST {
@@ -42,6 +43,11 @@ impl AST {
                 right.print(level + 1);
             }
             AST::Sub(left, right) => {
+                left.print(level + 1);
+                std::println!("{}-", ident);
+                right.print(level + 1);
+            }
+            AST::Times(left, right) => {
                 left.print(level + 1);
                 std::println!("{}-", ident);
                 right.print(level + 1);
@@ -86,7 +92,7 @@ impl<'a> CalcParser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Result<AST, Box<dyn Error>> {
-        let mut left = self.parse_factor()?;
+        let mut left = self.parse_term()?;
 
         while let Some(kind) = self.peek_kind() {
             if kind == TokenType::Plus || kind == TokenType::Minus {
@@ -101,6 +107,19 @@ impl<'a> CalcParser<'a> {
             } else {
                 break;
             }
+        }
+
+        Ok(left)
+    }
+
+    fn parse_term(&mut self) -> Result<AST, Box<dyn Error>> {
+        let mut left = self.parse_factor()?;
+
+        while let Some(TokenType::Times) = self.peek_kind() {
+            self.advance()?;
+            let right = self.parse_factor()?;
+
+            left = AST::Times(Box::new(left), Box::new(right));
         }
 
         Ok(left)

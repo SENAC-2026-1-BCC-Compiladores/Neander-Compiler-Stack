@@ -39,6 +39,10 @@ impl CodegenCalc {
                 self.generate_symbols(left);
                 self.generate_symbols(right);
             }
+            AST::Times(left, right) => {
+                self.generate_symbols(left);
+                self.generate_symbols(right);
+            }
         }
     }
 
@@ -77,6 +81,17 @@ impl CodegenCalc {
 
                 self.code.push_str(&format!("\tlda {}\n", left_result));
                 self.code.push_str(&format!("\tsub {}\n", right_result));
+                self.code.push_str(&format!("\tsta {}\n", res));
+
+                res
+            }
+            AST::Times(left, right) => {
+                let left_result = self.generate_instructions(left);
+                let right_result = self.generate_instructions(right);
+                let res = "t4".to_string();
+
+                self.code.push_str(&format!("\tlda {}\n", left_result));
+                self.code.push_str(&format!("\tmul {}\n", right_result));
                 self.code.push_str(&format!("\tsta {}\n", res));
 
                 res
