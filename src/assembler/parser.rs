@@ -51,6 +51,7 @@ pub enum Instruction {
     And(Operand),
     Loop,
     EndLoop,
+    Mul(Operand),
 }
 
 pub struct Program {
@@ -310,6 +311,7 @@ impl<'a> ParserT<'a> {
                     "jz" => Ok(Instruction::Jz(op)),
                     "or" => Ok(Instruction::Or(op)),
                     "and" => Ok(Instruction::And(op)),
+                    "mul" => Ok(Instruction::Mul(op)),
                     _ => Err(LexerError::new(format!(
                         "Expected 'instruction' at line {}, but found token '{}'",
                         self.current_line(),

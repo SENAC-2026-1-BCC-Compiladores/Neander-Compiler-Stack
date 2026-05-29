@@ -171,6 +171,40 @@ impl Codegen {
         }
     }
 
+    fn expand_mul(&mut self, op: &Operand) -> Result<(), LexerError> {
+        let t2 = Operand::Reserved(Reserved::T2);
+        let t3 = Operand::Reserved(Reserved::T3);
+        let t4 = Operand::Reserved(Reserved::T4);
+        let zero = Operand::Symbol("ZERO".to_string());
+        let one = Operand::Symbol("ONE".to_string());
+
+        self.emit_unary(16, &t2)?;
+        self.emit_unary(32, op)?;
+        self.emit_unary(16, &t3)?;
+
+        self.emit_unary(32, &zero)?;
+        self.emit_unary(16, &t4)?;
+
+        self.emit_unary(32, &t3)?;
+
+        self.expand_loop();
+
+        self.emit_unary(32, &t4)?;
+        self.emit_unary(48, &t2)?;
+        self.emit_unary(16, &t4)?;
+
+        self.emit_unary(32, &t3)?;
+        self.expand_sub(&one)?;
+        self.emit_unary(16, &t3)?;
+
+        self.emit_unary(32, &t3)?;
+        self.expand_end_loop()?;
+
+        self.emit_unary(32, &t4)?;
+
+        Ok(())
+    }
+
     fn emit_instruction(&mut self, instr: &Instruction) -> Result<(), LexerError> {
         match instr {
             Instruction::Nop => {
@@ -214,6 +248,9 @@ impl Codegen {
             }
             Instruction::EndLoop => {
                 self.expand_end_loop()?;
+            }
+            Instruction::Mul(op) => {
+                self.expand_mul(op)?;
             }
         }
 

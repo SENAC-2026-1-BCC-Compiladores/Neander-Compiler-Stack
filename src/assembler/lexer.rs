@@ -113,7 +113,7 @@ impl<'a> Lexer<'a> {
             "setup" | "text" | "end" => TokenType::Label(lexeme),
             "DATA" | "SPACE" | "ORG" => TokenType::DataDeclaration(lexeme),
             "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt"
-            | "sub" => TokenType::Instruction(lexeme),
+            | "sub" | "mul" => TokenType::Instruction(lexeme),
             "LOOP" | "END_LOOP" => TokenType::Loop(lexeme),
             _ => TokenType::Identfier(lexeme),
         }
