@@ -1,9 +1,12 @@
 setup
 	CONST15 DATA 15
 	CONST5 DATA 5
+	CONST1 DATA 1
 end
 text
-	lda CONST15
-	sub CONST5
+	lda CONST5
+	LOOP
+		sub CONST1
+	END_LOOP
 	hlt
 end

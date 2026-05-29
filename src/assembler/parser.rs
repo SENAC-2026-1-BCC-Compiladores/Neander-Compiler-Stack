@@ -49,6 +49,8 @@ pub enum Instruction {
     Not,
     Or(Operand),
     And(Operand),
+    Loop,
+    EndLoop,
 }
 
 pub struct Program {
@@ -318,8 +320,38 @@ impl<'a> ParserT<'a> {
         }
     }
 
+    fn parse_statement(&mut self) -> Result<Instruction, LexerError> {
+        match self.peek_kind() {
+            Some(TokenType::Loop(name)) => {
+                let instr = match name {
+                    "LOOP" => Instruction::Loop,
+                    "END_LOOP" => Instruction::EndLoop,
+                    _ => {
+                        return Err(LexerError::new(format!(
+                            "Unkown loop command '{}', at line {}",
+                            name,
+                            self.current_line()
+                        )));
+                    }
+                };
+
+                self.advance()?;
+                Ok(instr)
+            }
+            Some(TokenType::Instruction(_)) => self.parse_instruction(),
+
+            Some(wrong_kind) => Err(LexerError::new(format!(
+                "Unexpected token '{}', at line {}, was expecting instruction or loop token",
+                wrong_kind,
+                self.current_line()
+            ))),
+
+            None => Err(LexerError::new("Unexpected EOF".to_string())),
+        }
+    }
+
     fn parse_text(&mut self) -> Result<Vec<Instruction>, LexerError> {
-        self.parse_section("text", |parser| parser.parse_instruction())
+        self.parse_section("text", |parser| parser.parse_statement())
     }
 
     pub fn parse(&mut self) -> Result<Program, LexerError> {

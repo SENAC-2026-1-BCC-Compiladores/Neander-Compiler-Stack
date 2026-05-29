@@ -12,6 +12,9 @@ pub enum TokenType<'a> {
     // Espaços de memória reservados
     Reserved(&'a str),
 
+    // Loop_label
+    Loop(&'a str),
+
     // Instrucoes
     Instruction(&'a str),
     DataDeclaration(&'a str),
@@ -32,6 +35,7 @@ impl<'a> fmt::Display for TokenType<'a> {
             TokenType::Semicolon => "Semicolon",
             TokenType::DataDeclaration(_) => "Data Declaration",
             TokenType::Instruction(_) => "Instruction",
+            TokenType::Loop(_) => "Loop",
             TokenType::Reserved(_) => "Reserved",
             TokenType::Num(_) => "Number",
             TokenType::NewLine => "New Line",
@@ -110,6 +114,7 @@ impl<'a> Lexer<'a> {
             "DATA" | "SPACE" | "ORG" => TokenType::DataDeclaration(lexeme),
             "nop" | "add" | "sta" | "lda" | "or" | "and" | "not" | "jmp" | "jn" | "jz" | "hlt"
             | "sub" => TokenType::Instruction(lexeme),
+            "LOOP" | "END_LOOP" => TokenType::Loop(lexeme),
             _ => TokenType::Identfier(lexeme),
         }
     }
@@ -157,7 +162,7 @@ impl<'a> Lexer<'a> {
         let start_idx = self.position;
 
         while let Some(c) = self.peek() {
-            if !c.is_alphanumeric() {
+            if !c.is_alphanumeric() && c != '_' {
                 break;
             } else {
                 self.consume();
