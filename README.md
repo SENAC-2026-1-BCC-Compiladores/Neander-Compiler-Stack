@@ -76,7 +76,29 @@ Ou se preferir pode executar os binários com
 cargo run --bin <binario_alvo>
 ```
 
-Caso esteja em dúvida de quais são os binários alvos olhe para o arquivo Cargo.toml.
+O projeto foi idealizado para que cada binário seja modular, o que permite executar cada um de forma separada com:
+
+```bash
+cargo run --bin cacl --help
+cargo run --bin assembler --help
+cargo run --bin interpreter --help
+```
+
+Ou, se tiver instalado os binários via cargo install, você pode fazer:
+
+```bash
+calc --help
+assembler --help
+interpreter --help
+```
+
+Cada programa possui sua documentação e forma de uso descritas. 
+
+Os binários também podem ser usados em conjunto, uma vez que utilizam entrada e saída padrão (stdin e stdout):
+
+```bash
+calc --path exemplo.txt | assembler | interpreter
+```
 
 ## 📝 To-Do List
 
