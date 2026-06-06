@@ -5,11 +5,25 @@ use std::fs;
 use std::io::{self, Read};
 
 #[derive(Parser)]
+#[command(
+    name = "interpreter",
+    version = "0.1.0",
+    about = "Máquina virtual para interpretar arquivos .MEM para a arquitetura NEANDER",
+    long_about = "\
+Carrega um arquivo .MEM indicado pela opção '--path'.
+
+Caso nenhum caminho seja informado, o programa utiliza a entrada padrão (stdin).
+
+O usuário também pode usar a opção '--pc' para definir o contador inicial de instruções.
+"
+)]
 struct Cli {
+    /// Path do arquivo .MEM a ser lido
     #[arg(long, short)]
     path: Option<String>,
 
-    #[arg(long, short)]
+    /// Contador inicial do programa
+    #[arg(long)]
     pc: Option<u8>,
 }
 
