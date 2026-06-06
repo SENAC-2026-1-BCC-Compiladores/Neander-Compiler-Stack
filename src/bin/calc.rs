@@ -10,14 +10,28 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 #[derive(Parser)]
+#[command(
+    name = "calc",
+    version = "0.1.0",
+    about = "A calculator for the NEANDER architecture",
+    long_about = "\
+A calculator that can be used from the command line to perform addition,
+subtraction, and multiplication operations.
+
+It can also read a .txt file containing arithmetic expressions and generate
+equivalent NEANDER assembly code compatible with the assembler from the
+Neander Compiler Stack.
+"
+)]
 struct Cli {
+    /// Path to the .txt file to be read
     #[arg(short, long)]
     path: Option<String>,
 
+    /// Path to the .asm file to be written
     #[arg(short, long)]
     output: Option<String>,
 }
-
 fn process_expression() {
     println!("Neander interactive Calculator - Type 'q' to quit");
     let stdin = io::stdin();

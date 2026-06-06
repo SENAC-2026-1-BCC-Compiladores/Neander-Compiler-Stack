@@ -9,14 +9,28 @@ use std::io::Write;
 use std::path::PathBuf;
 
 #[derive(Parser)]
+#[command(
+    name = "assembler",
+    version = "0.1.0",
+    about = "An assembler for the NEANDER architecture",
+    long_about = "\
+Loads a .asm file specified by the '--path' option.
+
+If no path is provided, the program reads from standard input (stdin).
+
+If an output path is provided, the program generates a .MEM file compatible
+with the virtual machine from the Neander Compiler Stack.
+"
+)]
 struct Cli {
+    /// Path to the .asm file to be read
     #[arg(long, short)]
     path: Option<String>,
 
+    /// Path to the output .MEM file
     #[arg(long, short)]
     output: Option<String>,
 }
-
 pub fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let data: String;

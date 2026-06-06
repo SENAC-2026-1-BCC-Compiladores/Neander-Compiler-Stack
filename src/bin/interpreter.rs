@@ -8,25 +8,24 @@ use std::io::{self, Read};
 #[command(
     name = "interpreter",
     version = "0.1.0",
-    about = "Máquina virtual para interpretar arquivos .MEM para a arquitetura NEANDER",
+    about = "A virtual machine for the NEANDER architecture",
     long_about = "\
-Carrega um arquivo .MEM indicado pela opção '--path'.
+Loads a .MEM file specified by the '--path' option.
 
-Caso nenhum caminho seja informado, o programa utiliza a entrada padrão (stdin).
+If no path is provided, the program reads from standard input (stdin).
 
-O usuário também pode usar a opção '--pc' para definir o contador inicial de instruções.
+The '--pc' option can be used to specify the initial program counter value.
 "
 )]
 struct Cli {
-    /// Path do arquivo .MEM a ser lido
+    /// Path to the .MEM file to be read
     #[arg(long, short)]
     path: Option<String>,
 
-    /// Contador inicial do programa
+    /// Initial program counter value
     #[arg(long)]
     pc: Option<u8>,
 }
-
 pub fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let mut data: Vec<u8> = Vec::<u8>::new();
