@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    run-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Compilar programas
+        run: cargo build --release --workspace
+
+      - name: Empacotar binários
+        run: |
+          VERSION=${{ github.ref_name }}
+          mkdir -p dist
+
+          tar -czf dist/assembler-${VERSION}-x86_64-linux.tar.gz \
+            -C target/release assembler
+
+          tar -czf dist/calc-${VERSION}-x86_64-linux.tar.gz \
+            -C target/release calc
+
+          tar -czf dist/interpreter-${VERSION}-x86_64-linux.tar.gz \
+            -C target/release interpreter
+
+      - name: Criar Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+
+      - name: Checkout do manifesto
+        uses: actions/checkout@v4
+        with:
+          repository: Cit-Software-Distribution/.github
+          token: ${{ secrets.ORG_TOKEN }}
+          path: manifesto-repo
+
+      - name: Gerar checksums e manifesto
+        run: |
+          VERSION=${{ github.ref_name }}
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download/${VERSION}"
+
+          SHAASSEMBLER=$(sha256sum dist/assembler-${VERSION}-x86_64-linux.tar.gz | awk '{print $1}')
+          SHACALC=$(sha256sum dist/calc-${VERSION}-x86_64-linux.tar.gz | awk '{print $1}')
+          SHAINTERPRETER=$(sha256sum dist/interpreter-${VERSION}-x86_64-linux.tar.gz | awk '{print $1}')
+
+          jq -n \
+            --arg v "$VERSION" \
+            --arg u1 "${BASE_URL}/assembler-${VERSION}-x86_64-linux.tar.gz" \
+            --arg s1 "$SHAASSEMBLER" \
+            --arg u2 "${BASE_URL}/calc-${VERSION}-x86_64-linux.tar.gz" \
+            --arg s2 "$SHACALC" \
+            --arg u3 "${BASE_URL}/interpreter-${VERSION}-x86_64-linux.tar.gz" \
+            --arg s3 "$SHAINTERPRETER" \
+          '{
+            programs: {
+              assembler: { version: $v, url: $u1, checksum: $s1 },
+              calc: { version: $v, url: $u2, checksum: $s2 },
+              interpreter: { version: $v, url: $u3, checksum: $s3 }
+            }
+          }' > manifesto-repo/manifest.json
+
+      - name: Commit e push no manifesto
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: atualiza ${{ github.repository }} para ${{ github.ref_name }}"
+          git push
+            
