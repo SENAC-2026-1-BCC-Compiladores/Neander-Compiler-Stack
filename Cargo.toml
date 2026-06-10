@@ -1,0 +1,20 @@
+[package]
+name = "neander_compiler_stack"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "assembler"
+path = "src/bin/assembler.rs"
+
+[[bin]]
+name = "interpreter"
+path = "src/bin/interpreter.rs"
+
+[[bin]]
+name = "calc"
+path = "src/bin/calc.rs"
+
+[dependencies]
+clap = { version = "4.6.0", features = ["derive"] }
+bnf = "0.6"
